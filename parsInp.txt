@@ -1,0 +1,38 @@
+### Simulated data generation ###
+nObs_echo  5
+nObs_radial  16
+cannedPhases_echo 1
+cannedPhases_radial 5
+nFineTimes  1000
+obsUncty_echo  1.00
+obsUncty_radial  10000.00
+### Emcee control parameters ### 
+EMCEE  1
+#nWalkers 50
+#nSteps 300
+nWalkers 150
+nSteps 3500
+### Program control parameters ### 
+preserveOldFigures  0
+fewerFigs  0
+parsFilOut  parsRan.txt
+closeFigsAfter  1
+### True model parameters ### 
+m1_true  1.400
+m2_true  .700
+eccentricity_true 0
+#
+# SCO X-1
+#period_true .7873132
+#
+# ARA V801
+period_true .15804693
+iDeg_true  44
+omegaDeg_true  90
+t0_true 0
+### prior name choice
+useOO  1
+## priorName  mixed
+priorFile parsPrior.txt
+useGuessFile  1
+guessFile cannedGuess.txt

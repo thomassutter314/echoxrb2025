@@ -1,0 +1,10 @@
+run time durations of simulator_2.py using runSequence routine.
+
+Run_Parameters_(runNumber,Steps,Walkers): [1, 3500, 100]
+Start_Times: [1526278396.5904682]
+End_Times: [1526280371.9852562]
+Durations: [1975.3947880268097]
+Run_Parameters_(runNumber,Steps,Walkers): [1, 3500, 100]
+Start_Times: [1526879935.5105257]
+End_Times: [1526882476.892167]
+Durations: [2541.3816413879395]
