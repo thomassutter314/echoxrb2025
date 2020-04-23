@@ -1179,7 +1179,7 @@ def delaySignalOrbit_diskAngles(N = 10, m1_in = 1.4, m2_in = .7, period_in = .78
     
     
 
-def correctionInclination(Ni ,Na ,i0Deg = 5, ifDeg = 90, alphaDeg_i = 0, alphaDeg_f = 15 ,corrFile='correction_', cmap = plt.cm.cool, \
+def correctionInclination(Ni ,Na ,i0Deg = 5, ifDeg = 90, alphaDeg_i = 0, alphaDeg_f = 18 ,corrFile='correction_', cmap = plt.cm.cool, \
                               m1_in = 1, m2_in = 1, period_in = .787, radialVelocity = False):
 
     
