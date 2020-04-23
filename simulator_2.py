@@ -39,11 +39,12 @@ G = constants.G
 
 ### 2018-04-28 WIC - if we want to reproduce Jonker et al. 2004 Figure
 ### 4
-import jonkerMass
+#import jonkerMass
 from delaySignalRoche import *
 
 # A couple of global parameters for plotting
 plt.rc('font', family='serif')
+plt.tight_layout()
 matplotlib.rcParams.update({'font.size': 18})
 
 ### 2018-04-29 WIC - implemented priors in a new class
@@ -54,25 +55,28 @@ matplotlib.rcParams.update({'font.size': 18})
 def RocheModelDelay(phase = .5, m1_in = 1.4, m2_in = .7, period_in = .787, \
                     inclination = np.radians(44.), eccentricity = 0, omega = np.radians(90.),\
                      binNumber = 100, Q = 120, disk = True, diskShieldingAngle = np.radians(0), intKind = 'quadratic', \
-                    radialVelocity = False, innerLagrange = False):
+                    radialVelocity = False):
     y = delaySignal(phase = phase, m1_in = m1_in, m2_in = m2_in, period_in = period_in, inclination = inclination, eccentricity = eccentricity, \
                         omega = omega, binNumber = binNumber, Q = Q, disk = disk, diskShieldingAngle = diskShieldingAngle, intKind = intKind, \
-                        radialVelocity = radialVelocity, innerLagrange = innerLagrange, plot = False)
+                        radialVelocity = radialVelocity, plot = False)
     return y
 
 
 
 
 def configureData(R = 50):
+    #This function opens the correction files and configures them into the correction array
     Q = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0,1.1,1.2,1.3,1.4,1.5]
     #DATA = np.zeros([160+160*18+10*160*18,3])
     #CORR = np.zeros([160+160*18+10*160*18])
-    CORR = np.zeros([15,18,7998])
+    CORR = np.zeros([15,5,18,7998])
+    #[15,5,18,7998] -> 15 mass ratios, 5 opening angles, 18 inclinations, 7998 phases
     #print(np.shape(DATA))
     corrFile = "correction_q=%s.pickle" % Q[0]
     file = open(corrFile,'rb')
     data = pickle.load(file)
     I = data['inclination']
+    ALPHA = data['alpha']
     PHI = data['phase']
 
     for q in range(len(Q)):
@@ -80,10 +84,11 @@ def configureData(R = 50):
         file = open(corrFile,'rb')
         data = pickle.load(file)
         #print(np.shape(data['corrections']))
-        for i in range(len(I)):
-            for phi in range(len(PHI)):
-                CORR[q][i][phi] = data['corrections'][i][phi]
-        
+        for alph in range(len(ALPHA)):
+            for i in range(len(I)):
+                for phi in range(len(PHI)):
+                    CORR[q][alph][i][phi] = data['corrections'][alph][i][phi]
+            
         #print(data.keys())
         #print(len(data['phase'][::R]))
         #print(np.shape(data['corrections']))
@@ -98,7 +103,7 @@ def configureData(R = 50):
         #        CORR[index] = data['corrections'][i2][i3]
         #print(DATA)
         #file.close()
-    FUNC = RGI((Q, I, PHI), CORR, bounds_error = False)
+    FUNC = RGI((Q, ALPHA, I, PHI), CORR, bounds_error = False)
     return FUNC
 
 
@@ -113,14 +118,16 @@ try:
     FUNC_CORRECTION = funcARY.item()
 except:
     print("Pseudo 3D correction is missing. Run: initialPseudoConfig() and restart.")
-
-
+    #Attempts to load the corrections for the pseudo 3D model,
+    #if the correction file does not exist, the user must recalibrate the pseudo 3D model
+    #This takes ~1 hour on my system
 
 
 def parameterDependence(m1 = 1.4, m2 = 0.7, \
                               eccentricity = 0, \
                               period = .787, iDeg = 44., \
                               omegaDeg = 90., \
+                              alphaDeg = 0.,  \
                               parameter = 4, \
                               N = 20,\
                               cmap = cm.cool,\
@@ -130,14 +137,15 @@ def parameterDependence(m1 = 1.4, m2 = 0.7, \
     """Wrapper to plot the delay curve dependence on inclination for
     constant longitude of periastron"""
     #parameterList = [r"$m_1$",r"$m_2$","e","P","i",r"$\omega$"]
-    parameterList = [r"$m_1$",r"$m_2$","e","P (days)",r"i$(^\circ)$",r"$\omega(^\circ)$"]
+    parameterList = [r"$m_1$",r"$m_2$","e","P (days)",r"i$(^\circ)$",r"$\omega(^\circ)$",r"$\alpha(^\circ)$"]
     figName='figDelay_' + str(parameterList[parameter]) + 'DegVary.png'
     i = np.radians(iDeg)
     omega = np.radians(omegaDeg)
+    alpha = np.radians(alphaDeg)
     tt = np.linspace(0,1,1000)
     yy = [0]*10
-    Vals = [m1,m2,eccentricity,period,i,omega]
-    parameterRanges = [[.01,3],[0,3],[.01,.99],[0.1,25],[0,.5*np.pi],[0,.5*np.pi]]
+    Vals = [m1,m2,eccentricity,period,i,omega,alpha]
+    parameterRanges = [[.01,3],[0,3],[.01,.99],[0.1,25],[0,.5*np.pi],[0,.5*np.pi],[0,np.radians(15)]]
     #fig = plt.figure("Dependences")
     fig, ax = plt.subplots()
     plt.clf()
@@ -149,7 +157,7 @@ def parameterDependence(m1 = 1.4, m2 = 0.7, \
         rgba_colors[1] = 0
         Vals[parameter] = parameterRanges[parameter][0] + (parameterRanges[parameter][1]-parameterRanges[parameter][0])*k/N
         #delaySignal(plot = False)
-        yy = timeDelay(tt,*Vals,radialVelocity=radialVelocity, rocheLobe = rocheLobe)
+        yy = timeDelay(tt,*Vals,radialVelocity=radialVelocity, rocheLobe = rocheLobe, pseudo3D = True)
         plt.plot(tt[1:-1],yy[1:-1],color = cmap(k/N),linewidth = 1)
     #Y = timeDelay(tt,m1,m2,eccentricity,period,0,omega)
     #plt.plot(tt[1:-1],Y[1:-1],c='r',linewidth = 5)
@@ -159,7 +167,7 @@ def parameterDependence(m1 = 1.4, m2 = 0.7, \
     plt.ylabel("Echo Delay (s)")
     low = parameterRanges[parameter][0]
     high = parameterRanges[parameter][1]
-    if parameter == 4 or parameter == 5:
+    if parameter == 4 or parameter == 5 or parameter == 6:
         low = np.degrees(parameterRanges[parameter][0])
         high = np.degrees(parameterRanges[parameter][1])
         
@@ -510,16 +518,21 @@ def rangeTimeDelay(phase=np.array([]), \
 def timeDelay(phase=np.array([]), \
                   m1_in=1.4, m2_in=0.7, \
                   eccentricity=0.45, period_in=16.3,\
-                  inclination=np.radians(60.), omega=np.radians(90.), \
+                  inclination=np.radians(60.), omega=np.radians(90.), alpha=np.radians(0), \
                   gamma=0, radialVelocity = False, rocheLobe = True, radDonor = True, simpleKCOR = True, separationReturn = False, \
-                  innerLagrange = False, ellipticalCORR = False, pseudo3D = True):
+                  ellipticalCORR = False, pseudo3D = True, SP_setting = 'egg'):
+    
+    #SP_setting can be set to:
+    #plav -> uses the Plavec formula for the radius of the donor (i.e. the distance to the L1 point from the center of mass of the donor)
+    #egg  -> uses the Eggleton formula for the radius of the donor
+
     
     if ellipticalCORR == True:
         simpleKCOR = False
-        innerLagrange = False
+        
     if pseudo3D == True:
         rocheLobe = True
-        innerLagrange = False
+    
         
 
 
@@ -567,11 +580,12 @@ def timeDelay(phase=np.array([]), \
     #mu = m1*m2/(m1+m2)
     a = (G*(m1+m2)*period**2/(4*np.pi**2))**(1./3.)
 
+    #this sets the radius of the donor depending upon user specifications for which formula to use
     if rocheLobe == True:
-        if innerLagrange == False:
+        if SP_setting == 'egg':
             radiusDonor = a*(1-eccentricity)*(.49*q**(.667))/(.6*q**(.667)+np.log(1+q**(.333)))
             #Radius of the donor at periastron passage using the Eggleton radius
-        if innerLagrange == True:
+        if SP_setting == 'plav':
             radiusDonor = a*(1-eccentricity)*(.5+.227*np.log(q)/np.log(10))
     else:
         radiusDonor = 0
@@ -723,7 +737,7 @@ def timeDelay(phase=np.array([]), \
                 #print("q",q)
                 #print("inclination",inclination)
                 #print("ttt[i]",ttt[i])
-                CORR[i] = FUNC_CORRECTION([q,inclination,phase[i]])
+                CORR[i] = FUNC_CORRECTION([q,alpha,inclination,phase[i]])
                 #print("CORR",CORR)
                 delta[i] = delta[i]*CORR[i]
         if ellipticalCORR == True:
@@ -773,10 +787,11 @@ def timeDelay(phase=np.array([]), \
 def timeDelayPlot(radialVelocity = True, m1_in=1.4, m2_in=0.3, \
                   eccentricity=.5, period_in=16.3,\
                   inclination=np.radians(90.), omega=np.radians(90.), \
-                  rocheLobe = True, radDonor = True, pseudo3D = False):
+                  rocheLobe = True, radDonor = True, pseudo3D = True,alpha = np.radians(0)):
     tt = np.linspace(0,1,5000)
+    print(alpha)
     yy = timeDelay(tt,m1_in = m1_in, m2_in = m2_in, eccentricity = eccentricity, period_in = period_in, inclination = inclination, omega = omega, \
-                   radialVelocity = radialVelocity, rocheLobe = rocheLobe, radDonor = radDonor, pseudo3D = pseudo3D)
+                   radialVelocity = radialVelocity, rocheLobe = rocheLobe, radDonor = radDonor, pseudo3D = pseudo3D,alpha = alpha)
     plt.figure(1)
     plt.ylabel("Echo Delay (s)")
     if radialVelocity == True:
@@ -844,29 +859,29 @@ def orbit(m1_in=1.4, m2_in=0.3, eccentricity=0.45, period_in=16.3, \
     # Write the orbit figure to disk
     #plt.savefig(figOrbit)
 
-def go(e=0.45, a=6.0e9, figName='figTMP_go.png'):   
-
-    """Plots f_simple for given eccentricity and semimajor axis"""
-
-    ### 2018-04-28 WIC - this seems to refer to a function F(r) that
-    ### has been completely commented out (near line 230 or so)... is
-    ### this method now obsolete? 
-    ###
-    ### Either way, I have added in some default values.
-
-    ### WARN - this may not work! I think "integrand" expects x,y to
-    ### be defined globally...
-
-    rr = np.linspace((1-e)*a,(1+e)*a,1000)
-    #print(len(rr))
-    plt.xlabel("time")
-    plt.ylabel("separation")
-    tt = np.array(F(rr))
-    knot = F_simple((1+e)*a)
-    print("orbit INFO: knot:", knot)
-    plt.plot(tt,rr,2*knot-tt,rr)
-    plt.show(block=False)
-    plt.savefig(figName)
+#def go(e=0.45, a=6.0e9, figName='figTMP_go.png'):   
+#
+#    """Plots f_simple for given eccentricity and semimajor axis"""
+#
+#    ### 2018-04-28 WIC - this seems to refer to a function F(r) that
+#    ### has been completely commented out (near line 230 or so)... is
+#    ### this method now obsolete? 
+#    ###
+#    ### Either way, I have added in some default values.
+#
+#    ### WARN - this may not work! I think "integrand" expects x,y to
+#    ### be defined globally...
+#
+#    rr = np.linspace((1-e)*a,(1+e)*a,1000)
+#    #print(len(rr))
+#    plt.xlabel("time")
+#    plt.ylabel("separation")
+#    tt = np.array(F(rr))
+#    knot = F_simple((1+e)*a)
+#    print("orbit INFO: knot:", knot)
+#    plt.plot(tt,rr,2*knot-tt,rr)
+#    plt.show(block=False)
+#    plt.savefig(figName)
 
 def simpleFit(X=np.array([]), Y=np.array([]), yerr=np.array([]), \
                   func=timeDelay, \
@@ -972,10 +987,10 @@ def reparamToPars(parsRepar=np.array([]), nMin=7, degrees=False):
     return parsOut
 
 def lnlike(theta, x, y, y_err, obsRealTime = True, radialVelocity = False, rocheLobe = True, radDonor = True):
-    m1F, m2F, eF, pF, iF, wF, t0F  = theta #model parameters, N = 7
+    m1F, m2F, eF, pF, iF, wF, t0F, alphaF  = theta #model parameters, N = 8
     if obsRealTime == True:
         x = phaseFromTimes(x, t0 = t0F, period_in = pF)
-    model = timeDelay(x,m1F,m2F,eF,pF,iF,wF,rocheLobe = rocheLobe,radialVelocity = radialVelocity, radDonor = radDonor)
+    model = timeDelay(x,m1F,m2F,eF,pF,iF,wF,alphaF,rocheLobe = rocheLobe,radialVelocity = radialVelocity, radDonor = radDonor)
     inv_sigma2 = 1.0/(y_err**2)
     return -0.5*(np.sum((y-model)**2*inv_sigma2 - np.log(inv_sigma2)))
 
@@ -997,8 +1012,8 @@ def priorUninform(theta=np.array([]), pars=np.array([])):
     return 0.
 
 def priorFlat(theta=np.array([]), 
-                  bounds=np.array([ [1.35, 0., .001, 0., -np.pi, -np.pi, -np.inf], \
-                  [1.45, 8., .999, 30.45, np.pi, np.pi, np.inf] ])):
+                  bounds=np.array([ [1.35, 0., .001, 0., -np.pi, -np.pi, -np.inf,0], \
+                  [1.45, 8., .999, 30.45, np.pi, np.pi, np.inf,np.radians(15)] ])):
 
     """Returns a 1/0 using flat priors in the parameters"""
 
@@ -1109,6 +1124,7 @@ def lnProbObj(thetaIn, x_echo, y_echo, y_err_echo, x_radial, y_radial, y_err_rad
 #    if not np.isfinite(lp): ### Is this clause needed?
 #        return -np.inf
 #    return lp + lnlike(theta, x, y, y_err)
+
 def runSequence(runList='runList.txt', timeFile='timeFile.txt'):
     """Runs full simulation multiple times in accordance to the command file (runsList) which dictates how many runs and the parameters for each run."""
     ### Blank argument dictionary
@@ -1304,6 +1320,7 @@ def runSims(nObs_echo = 5, nObs_radial = 0, nObs_radialCompact = 0, \
                 period_true = 16.3, \
                 iDeg_true = 60., \
                 omegaDeg_true=90., \
+                alphaDeg_true=6., \
                 t0_true=0., \
                 cannedPhases_echo=0, \
                 cannedPhases_radial=0, \
@@ -1358,13 +1375,14 @@ def runSims(nObs_echo = 5, nObs_radial = 0, nObs_radialCompact = 0, \
     ### do some conversions
     inclination_true = np.radians(iDeg_true)
     omega_true = np.radians(omegaDeg_true)
+    alpha_true = np.radians(alphaDeg_true)
 
     ### Set up the true parameters array
     tt = np.linspace(0., 1., nFineTimes)
     if TEST == True:
         true_parameters = [m1_true, m2_true, eccentricity_true, \
                                period_true, inclination_true, \
-                               omega_true, t0_true]
+                               omega_true,t0_true,alpha_true]
 
         if Verbose:
             print("runSims INFO - True parameters:", true_parameters)
@@ -1387,10 +1405,10 @@ def runSims(nObs_echo = 5, nObs_radial = 0, nObs_radialCompact = 0, \
         if genWith3D == True:
             for i in range(len(yOrig_echo)):
                 yOrig_echo[i] = RocheModelDelay(x_echo_phases[i], m1_true, m2_true, period_true, inclination_true, eccentricity_true, \
-                                    omega_true, radialVelocity = False)
+                                    omega_true, radialVelocity = False,alpha=alpha_true)
         else:
             yOrig_echo = timeDelay(x_echo_phases, m1_true, m2_true, eccentricity_true, \
-                           period_true, inclination_true, omega_true, rocheLobe = rocheLobe, radialVelocity = False)
+                           period_true, inclination_true, omega_true, rocheLobe = rocheLobe, radialVelocity = False,alpha=alpha_true)
             
 
         
@@ -1429,7 +1447,7 @@ def runSims(nObs_echo = 5, nObs_radial = 0, nObs_radialCompact = 0, \
 
         # Now produce the fine-grained grid
         yy_echo = timeDelay(tt, m1_true, m2_true, eccentricity_true, \
-                           period_true, inclination_true, omega_true, rocheLobe = rocheLobe, radialVelocity = False)
+                           period_true, inclination_true, omega_true, rocheLobe = rocheLobe, radialVelocity = False,alpha=alpha_true)
         yy_radial = timeDelay(tt, m1_true, m2_true, eccentricity_true, \
                            period_true, inclination_true, omega_true, radialVelocity = True)
         yy_radialCompact = timeDelay(tt, m1_true, m2_true, eccentricity_true, \
@@ -1521,7 +1539,7 @@ def runSims(nObs_echo = 5, nObs_radial = 0, nObs_radialCompact = 0, \
     # prior state by fitting to the observed delay curve. Use numpy's
     # "around" function rather than looping through to do the
     # rounding.
-    if np.size(initialState1) < 7:
+    if np.size(initialState1) < 8:
         if nObs_echo > 2:
             if Verbose:
                 print("runSims INFO - fitting delay curve for initial guess")
@@ -1623,14 +1641,14 @@ def runSims(nObs_echo = 5, nObs_radial = 0, nObs_radialCompact = 0, \
         
         if TEST == True:
             truths=[m1_true, m2_true, eccentricity_true, \
-                        period_true, inclination_true, omega_true, t0_true]
+                        period_true, inclination_true, omega_true, t0_true,alpha_true]
         else:
-            truths=[0,0,0,0,0,0,0]
+            truths=[0,0,0,0,0,0,0,0]
         labels=[r'$m_1$', r'$m_2$', r'eccentricity', \
-                    r'period (days)',r'inclination (rad)',r'$\omega$ (rad)',r'$t_0$ (s)']
+                    r'period (days)',r'inclination (rad)',r'$\omega$ (rad)',r'$t_0$ (s)',r'$\alpha$ (rad)']
 
         # filename-friendly labels
-        lFiles = ['m1', 'm2', 'e', 'P', 'i', 'w', 't0']
+        lFiles = ['m1', 'm2', 'e', 'P', 'i', 'w', 't0', 'alpha']
 
         ### ndim is computed from the length of the prior state here
         ### before calling emcee. While I don't see a reason ndim
@@ -1788,6 +1806,7 @@ def runSims(nObs_echo = 5, nObs_radial = 0, nObs_radialCompact = 0, \
         wObj.write('iDeg_true  %.3f\n' % (iDeg_true))
         wObj.write('omegaDeg_true  %.3f\n' % (omegaDeg_true))
         wObj.write('t0_true  %.3f\n' % (t0_true))
+        wObj.write('alpha_true  %.3f\n' % (alphaDeg_true))
 
         # Canned initial guess?
         wObj.write("### Reading initial guess from file?\n")
@@ -1870,7 +1889,7 @@ def obsPhases(nObs=4, canned=0, setting='uniform', obsRealTime=True, period_in=0
         phiObs = phiObs*period + t0
     return phiObs
 
-def runEmcee(ndim = 7, \
+def runEmcee(ndim = 8, \
                  nwalkers=100, nSteps=350, \
                  initialState=np.array([]), \
                  x_echo=np.array([]), y_echo=np.array([]), y_err_echo=np.array([]), \
@@ -1937,8 +1956,8 @@ def runEmcee(ndim = 7, \
     ### Assemble the bounds for the flat prior out of what used to be
     ### in lnPrior:
     priorFunc = priorFlat
-    boundsLo = np.array( [0., 0., .001, 0., -np.pi, -np.pi, -np.inf] )
-    boundsHi = np.array( [50., 50., .999, 30.45, np.pi, np.pi, np.inf] )
+    boundsLo = np.array( [0., 0., .001, 0., -np.pi, -np.pi, -np.inf,0] )
+    boundsHi = np.array( [50., 50., .999, 30.45, np.pi, np.pi, np.inf,np.pi/2] )
     pHyper = np.vstack(( boundsLo, boundsHi ))
 
     ### 2018-04-29 UPDATE - set up a prior object and pass that in to
@@ -1983,7 +2002,7 @@ def runEmcee(ndim = 7, \
         if boundsMeansSigmas[i][0] == 'binaryBoundedOne':
             for j in range(nwalkers):
                 pos[j][i] = RAND(float(boundsMeansSigmas[i][1]),float(boundsMeansSigmas[i][2]))
-        if i == 4 or i == 5:
+        if (i == 4 or i == 5 or i == 7):
             for j in range(nwalkers):
                 pos[j][i] = np.radians(pos[j][i])
             
@@ -2047,7 +2066,7 @@ def runEmcee(ndim = 7, \
         return samples
 
     ### Moved the plot that calls the sampler up here.
-    for i in range(np.shape(samples)[-1]-1):
+    for i in range(np.shape(samples)[-1]):
 
         ### 2018-04-28 WIC - condition trap for zero dynamic range
         yVal = sampler.chain[:,:,i].T
@@ -2128,7 +2147,7 @@ def showCorner(samples=np.array([]), \
     ### submission. For the moment, let's unpack the values here from
     ### "truths:"
     m1_true, m2_true, eccentricity_true, \
-        period_true, inclination_true, omega_true, t0_true = truths
+        period_true, inclination_true, omega_true, t0_true, alpha_true = truths
 
     # generate the finer grid of phases
     x1 = np.linspace(0,1,nFine)
@@ -2145,9 +2164,9 @@ def showCorner(samples=np.array([]), \
     plt.xlabel("Orbital Phase")
     plt.ylabel("Time Delay (s)")
     #plt.title("Delay Curve")
-    for m1F,m2F,eF,pF,iF,wF,t0F in \
+    for m1F,m2F,eF,pF,iF,wF,t0F,alphaF in \
             samples[np.random.randint(len(samples), size=100)]:
-        yy = timeDelay(x1,m1F,m2F,eF,pF,iF,wF,radialVelocity=False,rocheLobe=rocheLobe)
+        yy = timeDelay(x1,m1F,m2F,eF,pF,iF,wF,alphaF,radialVelocity=False,rocheLobe=rocheLobe)
         plt.plot(x1,yy,color = "0.25",alpha = 0.1, zorder=1)
         #plt.plot(xl, m*xl**2, color="k", alpha=0.1)
         #print(M2)
@@ -2157,7 +2176,7 @@ def showCorner(samples=np.array([]), \
     # this as timeDelay(x1, *truths)... perhaps for later testing.
     if TEST == True:
         Y = timeDelay(x1, m1_true, m2_true, eccentricity_true, \
-                          period_true,inclination_true,omega_true,radialVelocity=False,rocheLobe=rocheLobe)
+                          period_true,inclination_true,omega_true,alpha_true,radialVelocity=False,rocheLobe=rocheLobe)
 
         ### changed plot color to blue for red/green colorblind viewers
         plt.plot(x1,Y,color = "b",alpha = 0.8, lw=2, zorder=2)
@@ -2175,10 +2194,10 @@ def showCorner(samples=np.array([]), \
     plt.xlabel("Orbital Phase")
     plt.ylabel("Velocity (km/s)")
     #plt.title("Delay Curve")
-    for m1F,m2F,eF,pF,iF,wF,t0F in \
+    for m1F,m2F,eF,pF,iF,wF,alphaF,t0F in \
             samples[np.random.randint(len(samples), size=100)]:
 
-        yy = timeDelay(x1,m1F,m2F,eF,pF,iF,wF,radialVelocity = True)
+        yy = timeDelay(x1,m1F,m2F,eF,pF,iF,wF,alphaF,radialVelocity = True)
         plt.plot(x1,yy/1000,color = "0.25",alpha = 0.1, zorder=1)
         #plt.plot(xl, m*xl**2, color="k", alpha=0.1)
         #print(M2)
@@ -2188,7 +2207,7 @@ def showCorner(samples=np.array([]), \
     # this as timeDelay(x1, *truths)... perhaps for later testing.
     if TEST == True:
         Y = timeDelay(x1, m1_true, m2_true, eccentricity_true, \
-                          period_true,inclination_true,omega_true,radialVelocity = True)
+                          period_true,inclination_true,omega_true,alpha_true,radialVelocity = True)
 
         ### changed plot color to blue for red/green colorblind viewers
         plt.plot(x1,Y/1000,color = "b",alpha = 0.8, lw=2, zorder=2)
@@ -2206,10 +2225,10 @@ def showCorner(samples=np.array([]), \
     plt.xlabel("Orbital Phase")
     plt.ylabel("Velocity (m/s)")
     #plt.title("Delay Curve")
-    for m1F,m2F,eF,pF,iF,wF,t0F in \
+    for m1F,m2F,eF,pF,iF,wF,t0F,alphaF in \
             samples[np.random.randint(len(samples), size=100)]:
 
-        yy = timeDelay(x1,m1F,m2F,eF,pF,iF,wF,radialVelocity = True,radDonor = False)
+        yy = timeDelay(x1,m1F,m2F,eF,pF,iF,wF,alphaF,radialVelocity = True,radDonor = False)
         plt.plot(x1,yy,color = "0.25",alpha = 0.1, zorder=1)
         #plt.plot(xl, m*xl**2, color="k", alpha=0.1)
         #print(M2)
@@ -2219,7 +2238,7 @@ def showCorner(samples=np.array([]), \
     # this as timeDelay(x1, *truths)... perhaps for later testing.
     if TEST == True:
         Y = timeDelay(x1, m1_true, m2_true, eccentricity_true, \
-                          period_true,inclination_true,omega_true,radialVelocity = True,radDonor = False)
+                          period_true,inclination_true,omega_true,alpha_true,radialVelocity = True,radDonor = False)
 
         ### changed plot color to blue for red/green colorblind viewers
         plt.plot(x1,Y,color = "b",alpha = 0.8, lw=2, zorder=2)
@@ -2237,7 +2256,7 @@ def showCorner(samples=np.array([]), \
     ### varNames = [r'$m_1$',r'$m_2$',r'eccentricity',r'period (days)',r'inclination (rad)',r'$\omega$ (rad)']
     varNames = labels[:]
 
-    m1_mcmc, m2_mcmc, e_mcmc, p_mcmc, i_mcmc, w_mcmc, t0_mcmc = \
+    m1_mcmc, m2_mcmc, e_mcmc, p_mcmc, i_mcmc, w_mcmc, t0_mcmc , alpha_mcmc = \
         map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]), \
                 zip(*np.percentile(samples, [16, 50, 84], \
                                        axis=0)))
@@ -2251,10 +2270,11 @@ def showCorner(samples=np.array([]), \
         wObj.write('i = ' + (str(i_mcmc))+ '\n')
         wObj.write('w = ' + (str(w_mcmc))+ '\n')
         wObj.write('t0 = ' + (str(t0_mcmc))+ '\n')
+        wObj.write('alpha = ' + (str(alpha_mcmc))+ '\n')
     
 
     if Verbose:
-        print("showCorner INFO:", list(m1_mcmc),list(m2_mcmc),list(e_mcmc),list(p_mcmc),list(i_mcmc),list(w_mcmc),list(t0_mcmc))
+        print("showCorner INFO:", list(m1_mcmc),list(m2_mcmc),list(e_mcmc),list(p_mcmc),list(i_mcmc),list(w_mcmc),list(t0_mcmc),list(alpha_mcmc))
 
     ### print("showCorner INFO -- ", np.shape(samples))
     ### ndim = np.shape(samples)[-1]
@@ -2277,7 +2297,7 @@ def showCorner(samples=np.array([]), \
     plt.ylabel("Probability Density")
     plt.xlim([0,3])
     data = samples[:,1]
-    plt.hist(data,bins = 80,normed = True)
+    plt.hist(data,bins = 80,density = True)
     if TEST == True:
         plt.axvline(x=m2_true,c = 'black')
 
@@ -2286,7 +2306,15 @@ def showCorner(samples=np.array([]), \
     plt.xlabel("Inclination (Deg.)")
     plt.ylabel("Probability Density")
     data = np.degrees(samples[:,4])
-    plt.hist(data,bins = 80,normed = True)
+    plt.hist(data,bins = 80,density = True)
+
+
+    plt.figure(903)
+    plt.clf()
+    plt.xlabel(r"$\alpha$ (Deg.)")
+    plt.ylabel("Probability Density")
+    data = np.degrees(samples[:,7])
+    plt.hist(data,bins = 80,density = True)
     if TEST == True:
         plt.axvline(x=np.degrees(inclination_true),c = 'black')
     #n, bins = np.histogram(data, 100)
@@ -2453,13 +2481,6 @@ def genRadVsignal(K = 50, N = 20):
     return phi, V
 
 
-
-
-def hypoRun():
-    loadParsAndRun()
-
-
-
 def quick(N = 10, m1_in = 1.4, m2_in = .7, period_in = .787, \
                     inclination = np.radians(44.), omega = np.radians(90.), eccentricity = 0, \
                     binNumber = 100, Q = 120, diskShieldingAngle = np.radians(0), intKind = 'cubic', radialVelocity = False,u=.6, plot = True):
@@ -2469,7 +2490,7 @@ def quick(N = 10, m1_in = 1.4, m2_in = .7, period_in = .787, \
                        radialVelocity=radialVelocity,rocheLobe=False, \
                        ellipticalCORR = True,pseudo3D = False)
     T2 = timeDelay(tt, m1_in=m1_in,m2_in=m2_in,period_in=period_in,inclination=inclination, \
-                       omega=omega,eccentricity=eccentricity,radialVelocity=radialVelocity,rocheLobe=True,innerLagrange=False,pseudo3D = False)
+                       omega=omega,eccentricity=eccentricity,radialVelocity=radialVelocity,rocheLobe=True,pseudo3D = False)
         
     plt.xlabel("Phase")
     plt.ylabel("Velocity (km/s)")
@@ -2542,7 +2563,7 @@ def makePlotCorner(supress = True):
     A[:,3] = A[:,3]*24
     A[:,4] = np.degrees(A[:,4])
     labelsLoc = np.array([r'$m_1$ ($M_\odot$)', r'$m_2$ ($M_\odot$)', \
-                    r'P (Hr)',r'i (Deg.)'])
+                    r'P (Hr)',r'i (Deg.)',r'$\alpha$ (Deg.)'])
     data = np.array([A[:,0],A[:,1],A[:,3],A[:,4]])
     data = np.transpose(data)
     figure = corner.corner(data,labels = labelsLoc,levels = [.68,.95], \

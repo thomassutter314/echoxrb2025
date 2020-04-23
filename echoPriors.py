@@ -57,7 +57,7 @@ class Priors(object):
 
         return self.methPrior(theta)
 
-    def parsAreWithinBounds(self, theta=np.array([]), nMin=7):
+    def parsAreWithinBounds(self, theta=np.array([]), nMin=8):
 
         """Returns True if bounds are within physical bounds, False
         otherwise"""
@@ -106,6 +106,7 @@ class Priors(object):
         # Convert the angular arguments to radians
         hypers[4] = np.radians(hypers[4])
         hypers[5] = np.radians(hypers[5])
+        hypers[7] = np.radians(hypers[7])
 
         # transpose into hyperparams
         self.hyper = np.transpose(hypers)
@@ -147,9 +148,9 @@ class Priors(object):
         ### 2018-05-06 WIC - **do not** enforce +/- pi limits on the
         ### angles here.
         self.boundsPhysLo = np.array(\
-            [0.00,  0.00,    0., 0.,    -np.inf, -np.inf,-np.inf ] )
+            [0.00,  0.00,    0., 0.,    -np.inf, -np.inf,-np.inf,0 ] )
         self.boundsPhysHi = np.array(\
-            [np.inf, np.inf, 1., np.inf, np.inf, np.inf,np.inf ] )
+            [np.inf, np.inf, 1., np.inf, np.inf, np.inf,np.inf, np.inf ] )
 
     def setupDefaultPars(self):
 
@@ -157,8 +158,8 @@ class Priors(object):
 
         ### Written out here to make easier to debug in the future
 
-        boundsLo = np.array([1.35, 0., .001, 0.,      0.0,    -np.pi, -np.inf])
-        boundsHi = np.array([1.45, 8., .999, 30.45, np.pi/2.,  np.pi, np.inf])
+        boundsLo = np.array([1.35, 0., .001, 0.,      0.0,    -np.pi, -np.inf,0])
+        boundsHi = np.array([1.45, 8., .999, 30.45, np.pi/2.,  np.pi, np.inf,np.inf])
 
         self.hyper = np.vstack(( boundsLo, boundsHi ))
 
@@ -306,13 +307,13 @@ class Priors(object):
         ### Borrowed from Thomas' plot routines
         self.plotLabels = [r'$m_1$', r'$m_2$', r'eccentricity', \
                                r'period (days)', \
-                               r'inclination (rad)',r'$\omega$ (rad)',r'$t_0$']
+                               r'inclination (rad)',r'$\omega$ (rad)',r'$t_0$',r'$\alpha$ (rad)']
 
         ### Change these to update the plot ranges for each
         ### parameter. 
         angOut = np.pi+0.3
-        self.plotLimsLo = [1.0, -1.0, -0.2, -1.0, -angOut, -angOut, -10]
-        self.plotLimsHi = [2.2, 10.0,  1.2, 35.0,  angOut,  angOut, 10]
+        self.plotLimsLo = [1.0, -1.0, -0.2, -1.0, -angOut, -angOut, -10,0]
+        self.plotLimsHi = [2.2, 10.0,  1.2, 35.0,  angOut,  angOut, 10,1.2]
 
         ### We specify the method for the uniformly-spaced grid. If we
         ### want to make one of these logspace (say) we just change
