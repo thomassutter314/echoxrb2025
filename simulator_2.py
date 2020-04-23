@@ -24,8 +24,10 @@ import matplotlib.cm as cm
 from mpl_toolkits.mplot3d import Axes3D
 import pickle
 from scipy.interpolate import RegularGridInterpolator as RGI
-from tkinter.filedialog import askopenfilename
-from tkinter import Tk
+
+# 2020-04-23 WIC - commented out these two imports since they don't seem to be needed.
+#from tkinter.filedialog import askopenfilename
+#from tkinter import Tk
 
 # import the priors object (now exported to an external module)
 import echoPriors
@@ -519,8 +521,9 @@ def timeDelay(phase=np.array([]), \
                   m1_in=1.4, m2_in=0.7, \
                   eccentricity=0.45, period_in=16.3,\
                   inclination=np.radians(60.), omega=np.radians(90.), alpha=np.radians(0), \
-                  gamma=0, radialVelocity = False, rocheLobe = True, radDonor = True, simpleKCOR = True, separationReturn = False, \
-                  ellipticalCORR = False, pseudo3D = True, SP_setting = 'egg'):
+                  gamma=0, radialVelocity = False, rocheLobe = True, \
+              radDonor = True, simpleKCOR = True, separationReturn = False, \
+              ellipticalCORR = False, pseudo3D = True, SP_setting = 'egg'):
     
     #SP_setting can be set to:
     #plav -> uses the Plavec formula for the radius of the donor (i.e. the distance to the L1 point from the center of mass of the donor)
@@ -733,13 +736,17 @@ def timeDelay(phase=np.array([]), \
         if pseudo3D == True:
             #print(delta)
             CORR = np.zeros(len(phase))
-            for i in range(len(delta)):
-                #print("q",q)
-                #print("inclination",inclination)
-                #print("ttt[i]",ttt[i])
-                CORR[i] = FUNC_CORRECTION([q,alpha,inclination,phase[i]])
-                #print("CORR",CORR)
-                delta[i] = delta[i]*CORR[i]
+
+            # 2020-04-23 WIC - check whether FUNC_CORRECTION is defined:
+            if "FUNC_CORRECTION" in dir():
+                for i in range(len(delta)):
+                    #print("q",q)
+                    #print("inclination",inclination)
+                    #print("ttt[i]",ttt[i])
+                    CORR[i] = FUNC_CORRECTION([q,alpha,inclination,phase[i]])
+                    #print("CORR",CORR)
+                    delta[i] = delta[i]*CORR[i]
+                    
         if ellipticalCORR == True:
             A = 1
         return delta
