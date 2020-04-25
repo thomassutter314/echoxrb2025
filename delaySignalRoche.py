@@ -867,7 +867,11 @@ def effectiveRadius(phi = .5, m1_in = 1.4, m2_in = .7, period_in = .787,\
                     inclination = np.radians(44.), omega = np.radians(90.), eccentricity = 0, \
                     binNumber = 100, Q = 120, alpha = np.radians(0), intKind = 'cubic', \
                      radialVelocity = False,u=.6, plot = False , p3d = True, outputData = False, \
-                     FUNC = FUNC_CORRECTION,verbose = False):
+                     # FUNC = FUNC_CORRECTION, \
+                    verbose = False):
+
+    # 2020-04-23 WIC - removed the unused call to FUNC
+    
     q = m2_in/m1_in
     period = period_in * constants.day
     m1 = m1_in * constants.M_Sun
@@ -971,8 +975,12 @@ def delaySignalOrbit(N = 10, m1_in = 1.4, m2_in = .7, period_in = .787, \
                     inclination = np.radians(44.), omega = np.radians(90.), eccentricity = 0, \
                     binNumber = 100, Q = 120, alpha = np.radians(0), intKind = 'cubic', \
                      radialVelocity = False,u=.6, plot = True , p3d = True, outputData = False, \
-                     FUNC = FUNC_CORRECTION, fast = False, verbose = False):
+                     # FUNC = FUNC_CORRECTION, \
+                     FUNC = None, \
+                     fast = False, verbose = False):
 
+    # 2020-04-23 WIC - handle the case where FUNC_CORRECTION hasn't been set yet
+    
     #Make sure that Q = 120 for high precision
     q = m2_in/m1_in
     period = period_in * constants.day
@@ -1026,9 +1034,16 @@ def delaySignalOrbit(N = 10, m1_in = 1.4, m2_in = .7, period_in = .787, \
     TP = simulator_2.timeDelay(ttt, m1_in=m1_in,m2_in=m2_in,period_in=period_in,inclination=inclination, \
                        omega=omega,eccentricity=eccentricity,radialVelocity=radialVelocity,rocheLobe=True,pseudo3D = True, \
                                SP_setting = 'egg',alpha=alpha) #Pseudo 3D
-    #for i in range(len(ttt)):
-    #    CORR[i] = FUNC([q,inclination,ttt[i]])
-    #    TP[i] = TP[i]*CORR[i]
+
+    # 2020-04-23 this call to FUNC (the only one in this method) was
+    # commented out. I have inserted some syntax to gracefully handle
+    # the case where FUNC hasn't yet been set.
+
+    #if FUNC is not None:
+    #    for i in range(len(ttt)):
+    #        CORR[i] = FUNC([q,inclination,ttt[i]])
+    #        TP[i] = TP[i]*CORR[i]
+
     if plot == True:
         plt.figure(1)
 
