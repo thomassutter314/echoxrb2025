@@ -71,7 +71,12 @@ def configureData(R = 50):
     Q = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0,1.1,1.2,1.3,1.4,1.5]
     #DATA = np.zeros([160+160*18+10*160*18,3])
     #CORR = np.zeros([160+160*18+10*160*18])
-    CORR = np.zeros([15,5,18,7998])
+
+    # 2020-04-25 WIC - initialize to blank, let the pickle file
+    # determine the dimensions. 
+    #CORR = np.zeros([15,5,18,7998])
+    CORR = np.array([])
+    
     #[15,5,18,7998] -> 15 mass ratios, 5 opening angles, 18 inclinations, 7998 phases
     #print(np.shape(DATA))
     corrFile = "correction_q=%s.pickle" % Q[0]
@@ -81,10 +86,29 @@ def configureData(R = 50):
     ALPHA = data['alpha']
     PHI = data['phase']
 
+    # 2020-04-25 WIC - debug statement: why is this breaking?
+    #print("INFO: I", len(I), np.shape(CORR))
+    
     for q in range(len(Q)):
         corrFile = "correction_q=%s.pickle" % Q[q]
         file = open(corrFile,'rb')
         data = pickle.load(file)
+
+        # 2020-04-25 make the dimensions of the CORR array match the
+        # dimensions of the pickle file. There's a more elegant,
+        # pythonic way to do this, but I'm going for human readability
+        # at the moment...
+        if np.size(CORR) < 1:
+            shpCor = np.shape(data['corrections'])
+            nq = len(Q)
+            nAlpha = shpCor[0]
+            nIncl = shpCor[1]
+            nPhi = shpCor[2]
+            CORR = np.zeros([nq, nAlpha, nIncl, nPhi]) 
+            
+            print('CORR shape info - ', \
+                  np.shape(data['corrections']), np.shape(CORR))
+        
         #print(np.shape(data['corrections']))
         for alph in range(len(ALPHA)):
             for i in range(len(I)):
