@@ -24,10 +24,8 @@ import matplotlib.cm as cm
 from mpl_toolkits.mplot3d import Axes3D
 import pickle
 from scipy.interpolate import RegularGridInterpolator as RGI
-
-# 2020-04-23 WIC - commented out these two imports since they don't seem to be needed.
-#from tkinter.filedialog import askopenfilename
-#from tkinter import Tk
+from tkinter.filedialog import askopenfilename
+from tkinter import Tk
 
 # import the priors object (now exported to an external module)
 import echoPriors
@@ -48,6 +46,7 @@ from delaySignalRoche import *
 plt.rc('font', family='serif')
 plt.tight_layout()
 matplotlib.rcParams.update({'font.size': 18})
+plt.tight_layout()
 
 ### 2018-04-29 WIC - implemented priors in a new class
 ### class PriorsOLDER(object):  # renamed for safe testing
@@ -56,10 +55,10 @@ matplotlib.rcParams.update({'font.size': 18})
 
 def RocheModelDelay(phase = .5, m1_in = 1.4, m2_in = .7, period_in = .787, \
                     inclination = np.radians(44.), eccentricity = 0, omega = np.radians(90.),\
-                     binNumber = 100, Q = 120, disk = True, diskShieldingAngle = np.radians(0), intKind = 'quadratic', \
+                     binNumber = 100, Q = 120, disk = True, alpha = np.radians(0), intKind = 'quadratic', \
                     radialVelocity = False):
     y = delaySignal(phase = phase, m1_in = m1_in, m2_in = m2_in, period_in = period_in, inclination = inclination, eccentricity = eccentricity, \
-                        omega = omega, binNumber = binNumber, Q = Q, disk = disk, diskShieldingAngle = diskShieldingAngle, intKind = intKind, \
+                        omega = omega, binNumber = binNumber, Q = Q, disk = disk, alpha = alpha, intKind = intKind, \
                         radialVelocity = radialVelocity, plot = False)
     return y
 
@@ -71,12 +70,7 @@ def configureData(R = 50):
     Q = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0,1.1,1.2,1.3,1.4,1.5]
     #DATA = np.zeros([160+160*18+10*160*18,3])
     #CORR = np.zeros([160+160*18+10*160*18])
-
-    # 2020-04-25 WIC - initialize to blank, let the pickle file
-    # determine the dimensions. 
-    #CORR = np.zeros([15,5,18,7998])
-    CORR = np.array([])
-    
+    CORR = np.zeros([15,5,18,7998])
     #[15,5,18,7998] -> 15 mass ratios, 5 opening angles, 18 inclinations, 7998 phases
     #print(np.shape(DATA))
     corrFile = "correction_q=%s.pickle" % Q[0]
@@ -86,29 +80,10 @@ def configureData(R = 50):
     ALPHA = data['alpha']
     PHI = data['phase']
 
-    # 2020-04-25 WIC - debug statement: why is this breaking?
-    #print("INFO: I", len(I), np.shape(CORR))
-    
     for q in range(len(Q)):
         corrFile = "correction_q=%s.pickle" % Q[q]
         file = open(corrFile,'rb')
         data = pickle.load(file)
-
-        # 2020-04-25 make the dimensions of the CORR array match the
-        # dimensions of the pickle file. There's a more elegant,
-        # pythonic way to do this, but I'm going for human readability
-        # at the moment...
-        if np.size(CORR) < 1:
-            shpCor = np.shape(data['corrections'])
-            nq = len(Q)
-            nAlpha = shpCor[0]
-            nIncl = shpCor[1]
-            nPhi = shpCor[2]
-            CORR = np.zeros([nq, nAlpha, nIncl, nPhi]) 
-            
-            print('CORR shape info - ', \
-                  np.shape(data['corrections']), np.shape(CORR))
-        
         #print(np.shape(data['corrections']))
         for alph in range(len(ALPHA)):
             for i in range(len(I)):
@@ -139,6 +114,7 @@ def initialPseudoConfig():
     #DOut = {'func':FUNC_CORRECTION}
     #fileName = 'Func_Correction.pickle'
     #pickle.dump(DOut, open(fileName, 'wb'))
+    
 try:
     funcARY = np.load('Func_Correction.npy')
     FUNC_CORRECTION = funcARY.item()
@@ -146,7 +122,6 @@ except:
     print("Pseudo 3D correction is missing. Run: initialPseudoConfig() and restart.")
     #Attempts to load the corrections for the pseudo 3D model,
     #if the correction file does not exist, the user must recalibrate the pseudo 3D model
-    #This takes ~1 hour on my system
 
 
 def parameterDependence(m1 = 1.4, m2 = 0.7, \
@@ -545,9 +520,8 @@ def timeDelay(phase=np.array([]), \
                   m1_in=1.4, m2_in=0.7, \
                   eccentricity=0.45, period_in=16.3,\
                   inclination=np.radians(60.), omega=np.radians(90.), alpha=np.radians(0), \
-                  gamma=0, radialVelocity = False, rocheLobe = True, \
-              radDonor = True, simpleKCOR = True, separationReturn = False, \
-              ellipticalCORR = False, pseudo3D = True, SP_setting = 'egg'):
+                  gamma=0, radialVelocity = False, rocheLobe = True, radDonor = True, simpleKCOR = True, separationReturn = False, \
+                  ellipticalCORR = False, pseudo3D = True, SP_setting = 'egg'):
     
     #SP_setting can be set to:
     #plav -> uses the Plavec formula for the radius of the donor (i.e. the distance to the L1 point from the center of mass of the donor)
@@ -760,17 +734,13 @@ def timeDelay(phase=np.array([]), \
         if pseudo3D == True:
             #print(delta)
             CORR = np.zeros(len(phase))
-
-            # 2020-04-23 WIC - check whether FUNC_CORRECTION is defined:
-            if "FUNC_CORRECTION" in dir():
-                for i in range(len(delta)):
-                    #print("q",q)
-                    #print("inclination",inclination)
-                    #print("ttt[i]",ttt[i])
-                    CORR[i] = FUNC_CORRECTION([q,alpha,inclination,phase[i]])
-                    #print("CORR",CORR)
-                    delta[i] = delta[i]*CORR[i]
-                    
+            for i in range(len(delta)):
+                #print("q",q)
+                #print("inclination",inclination)
+                #print("ttt[i]",ttt[i])
+                CORR[i] = FUNC_CORRECTION([q,alpha,inclination,phase[i]])
+                #print("CORR",CORR)
+                delta[i] = delta[i]*CORR[i]
         if ellipticalCORR == True:
             A = 1
         return delta
@@ -1372,6 +1342,7 @@ def runSims(nObs_echo = 5, nObs_radial = 0, nObs_radialCompact = 0, \
                 useGuessFile=True, \
                 guessFile='cannedGuess.txt', \
                 guessRangeFile='cannedRangeGuess.txt', \
+                figFolder = 'figFolder', \
                 useOO=True, \
                 fewerFigs=True, \
                 EMCEE=False, \
@@ -1614,7 +1585,7 @@ def runSims(nObs_echo = 5, nObs_radial = 0, nObs_radialCompact = 0, \
     plt.ylabel('Delay (s)')
     plt.title("Echo Delay Initial Guess")
     plt.legend(loc=0, fontsize=10)
-    plt.savefig('fig_initialGuess_echo.png')
+    plt.savefig(figFolder + '/' + 'fig_initialGuess_echo.png')
     
     plt.figure(6)
     plt.clf()
@@ -1630,7 +1601,7 @@ def runSims(nObs_echo = 5, nObs_radial = 0, nObs_radialCompact = 0, \
     plt.ylabel('Velocity (m/s)')
     plt.title("Radial Velocity Initial Guess")
     plt.legend(loc=0, fontsize=10)
-    plt.savefig('fig_initialGuess_radial.png')
+    plt.savefig(figFolder + '/' +'fig_initialGuess_radial.png')
     
     plt.figure("velocityDelayMap")
     plt.xlabel('Delay (s)')
@@ -1639,7 +1610,7 @@ def runSims(nObs_echo = 5, nObs_radial = 0, nObs_radialCompact = 0, \
         plt.plot(yy_echo, yy_radial,'b-', lw=2, label='"Truth"')
     plt.plot(timeDelay(tFine,*initialState2,radialVelocity = False,rocheLobe=rocheLobe),timeDelay(tFine,*initialState2,radialVelocity = True),'--g', \
                  label=labelGuess)
-    plt.savefig('fig_velocityDelayMap.png')
+    plt.savefig(figFolder + '/' +  'fig_velocityDelayMap.png')
 
 
     plt.figure("radialCompact")
@@ -1658,7 +1629,7 @@ def runSims(nObs_echo = 5, nObs_radial = 0, nObs_radialCompact = 0, \
     plt.ylabel('Velocity (m/s)')
     plt.title("Radial Velocity Initial Guess (Compact)")
     plt.legend(loc=0, fontsize=10)
-    plt.savefig('fig_initialGuess_radialCompact.png')
+    plt.savefig(figFolder + '/' + 'fig_initialGuess_radialCompact.png')
     
     plt.show(block=True)
 
@@ -1699,7 +1670,8 @@ def runSims(nObs_echo = 5, nObs_radial = 0, nObs_radialCompact = 0, \
                                    useReparam=useReparam, \
                                    useOO=useOO, \
                                    obsRealTime = obsRealTime, \
-                                   guessRangeFile = guessRangeFile)
+                                   guessRangeFile = guessRangeFile, \
+                                   figFolder = figFolder)
 
         ### 2018-05-03 WIC: added some logic to return gracefully if
         ### runEmcee terminated without returning a populated samples
@@ -1733,7 +1705,8 @@ def runSims(nObs_echo = 5, nObs_radial = 0, nObs_radialCompact = 0, \
                        fewerFigs=fewerFigs, \
                        TEST=TEST, \
                        Verbose=Verbose, \
-                       rocheLobe=rocheLobe)
+                       rocheLobe=rocheLobe, \
+                       figFolder = figFolder)
         
         DATA_STORAGE = [samplesMCMC, labels, truths, \
                        x_echo_phases, y_echo, y_err_echo, \
@@ -1936,7 +1909,8 @@ def runEmcee(ndim = 8, \
                  showPlot=True, \
                  Verbose=True, \
                  obsRealTime=True, \
-                 rocheLobe=True):
+                 rocheLobe=True,\
+                 figFolder = 'figFolder'):
     
     """Refactored the MCMC into a separate method"""
 
@@ -1998,7 +1972,7 @@ def runEmcee(ndim = 8, \
     ### the prior file in preference to the string supplied on the
     ### command line.
     PRIORS = echoPriors.Priors(namePrior=priorName, \
-                                   filParams=priorFile)
+                                   filParams=priorFile, figPrior = figFolder + '/fig_priors.png')
     PRIORS.wrapPlotPriors()
     if Verbose:
         ### Report the arguments to runEmcee
@@ -2045,7 +2019,7 @@ def runEmcee(ndim = 8, \
         plt.hist(A[:,i],bins = 15)
         plt.title(varNames[i])
         #print("pos(" + str(i) + "): " + str(pos[:][i]))
-        plt.savefig("InitializationState_" + str(i) + ".png")
+        plt.savefig(figFolder + '/' + "InitializationState_" + str(i) + ".png")
     
     posPhysical = pos
     if useReparam:
@@ -2107,7 +2081,7 @@ def runEmcee(ndim = 8, \
         plt.clf()
         plt.title(varNames[i])
         res=plt.plot(reparamToPars(sampler.chain[:,:,i].T), '-', color='k', alpha=0.15)
-        A.savefig("walkerPath_" + str(i) + ".png")
+        A.savefig(figFolder + '/' + "walkerPath_" + str(i) + ".png")
 
     return samples
 
@@ -2129,7 +2103,8 @@ def showCorner(samples=np.array([]), \
                parsResultsFile = "MCMC_results.txt", \
                TEST=True, \
                rocheLobe=True,\
-               loaded = False):
+               loaded = False,\
+               figFolder = 'figFolder'):
 
     
 
@@ -2166,7 +2141,7 @@ def showCorner(samples=np.array([]), \
                                 quantiles=quantiles, show_titles=True, \
                                 #fig=fig, \
                                 title_kwargs={"fontsize": 12})
-        fig.savefig(figCorner)
+        fig.savefig(figFolder + '/' + figCorner)
 
 
     ### 2018-04-28 WIC - at this point we can unpack the truth values
@@ -2177,8 +2152,9 @@ def showCorner(samples=np.array([]), \
     ### refactoring), but that can wait till after paper
     ### submission. For the moment, let's unpack the values here from
     ### "truths:"
-    m1_true, m2_true, eccentricity_true, \
-        period_true, inclination_true, omega_true, t0_true, alpha_true = truths
+    m1_true, m2_true, eccentricity_true, period_true, inclination_true, omega_true, t0_true, alpha_true = truths
+    
+    truthsIn = [m1_true, m2_true, eccentricity_true, period_true, inclination_true, omega_true, alpha_true]
 
     # generate the finer grid of phases
     x1 = np.linspace(0,1,nFine)
@@ -2199,15 +2175,10 @@ def showCorner(samples=np.array([]), \
             samples[np.random.randint(len(samples), size=100)]:
         yy = timeDelay(x1,m1F,m2F,eF,pF,iF,wF,alphaF,radialVelocity=False,rocheLobe=rocheLobe)
         plt.plot(x1,yy,color = "0.25",alpha = 0.1, zorder=1)
-        #plt.plot(xl, m*xl**2, color="k", alpha=0.1)
-        #print(M2)
-    #samples[:, 0] = np.exp(samples[:, 0])
 
-    # 2018-04-28 WIC actually I think it might also work to just call
-    # this as timeDelay(x1, *truths)... perhaps for later testing.
+
     if TEST == True:
-        Y = timeDelay(x1, m1_true, m2_true, eccentricity_true, \
-                          period_true,inclination_true,omega_true,alpha_true,radialVelocity=False,rocheLobe=rocheLobe)
+        Y = timeDelay(x1, *truthsIn ,radialVelocity=False,rocheLobe=rocheLobe)
 
         ### changed plot color to blue for red/green colorblind viewers
         plt.plot(x1,Y,color = "b",alpha = 0.8, lw=2, zorder=2)
@@ -2218,7 +2189,7 @@ def showCorner(samples=np.array([]), \
 
     ### 2018-04-30 WIC - I like this figure so much that I want to
     ### save it
-    plt.savefig(figSamplesEcho)
+    plt.savefig(figFolder + '/' + figSamplesEcho)
     ############################# Does another plot for the radial velocity curves
     plt.figure(3)
     plt.clf()
@@ -2230,15 +2201,10 @@ def showCorner(samples=np.array([]), \
 
         yy = timeDelay(x1,m1F,m2F,eF,pF,iF,wF,alphaF,radialVelocity = True)
         plt.plot(x1,yy/1000,color = "0.25",alpha = 0.1, zorder=1)
-        #plt.plot(xl, m*xl**2, color="k", alpha=0.1)
-        #print(M2)
-    #samples[:, 0] = np.exp(samples[:, 0])
 
-    # 2018-04-28 WIC actually I think it might also work to just call
-    # this as timeDelay(x1, *truths)... perhaps for later testing.
+
     if TEST == True:
-        Y = timeDelay(x1, m1_true, m2_true, eccentricity_true, \
-                          period_true,inclination_true,omega_true,alpha_true,radialVelocity = True)
+        Y = timeDelay(x1, *truthsIn ,radialVelocity = True)
 
         ### changed plot color to blue for red/green colorblind viewers
         plt.plot(x1,Y/1000,color = "b",alpha = 0.8, lw=2, zorder=2)
@@ -2265,11 +2231,8 @@ def showCorner(samples=np.array([]), \
         #print(M2)
     #samples[:, 0] = np.exp(samples[:, 0])
 
-    # 2018-04-28 WIC actually I think it might also work to just call
-    # this as timeDelay(x1, *truths)... perhaps for later testing.
     if TEST == True:
-        Y = timeDelay(x1, m1_true, m2_true, eccentricity_true, \
-                          period_true,inclination_true,omega_true,alpha_true,radialVelocity = True,radDonor = False)
+        Y = timeDelay(x1, *truthsIn ,radialVelocity = True,radDonor = False)
 
         ### changed plot color to blue for red/green colorblind viewers
         plt.plot(x1,Y,color = "b",alpha = 0.8, lw=2, zorder=2)
@@ -2280,7 +2243,7 @@ def showCorner(samples=np.array([]), \
 
     ### 2018-04-30 WIC - I like this figure so much that I want to
     ### save it
-    plt.savefig(figSamplesRadialCompact)
+    plt.savefig(figFolder + '/' + figSamplesRadialCompact)
     
     ### 2018-04-28 WIC - I suspect this can be taken from the "labels"
     ### array... isn't it in the same order?
@@ -2307,22 +2270,6 @@ def showCorner(samples=np.array([]), \
     if Verbose:
         print("showCorner INFO:", list(m1_mcmc),list(m2_mcmc),list(e_mcmc),list(p_mcmc),list(i_mcmc),list(w_mcmc),list(t0_mcmc),list(alpha_mcmc))
 
-    ### print("showCorner INFO -- ", np.shape(samples))
-    ### ndim = np.shape(samples)[-1]
-    ### for i in range(ndim-1):
-    ###    plt.figure(10 + i)  ### 2018-04-28 WIC - constrain the figure number
-    ###    plt.clf()
-    ###    plt.title(varNames[i])
-    ###    res=plt.plot(sampler.chain[:,:,i].T, '-', color='k', alpha=0.15)
-    #np.random.seed(19680801)
-    #Posterier distribution of m1+m2
-    #plt.figure(900)
-    #plt.xlabel("Mass ($M_\odot$)")
-    #plt.ylabel("Probability Density")
-    #plt.title("Posterier Distribution")
-    #data = samples[:,0]+samples[:,1]
-    #plt.hist(data,bins = 80,normed = True)
-
     plt.figure(901)
     plt.xlabel(r"$m_2$ ($M_\odot$)")
     plt.ylabel("Probability Density")
@@ -2338,6 +2285,8 @@ def showCorner(samples=np.array([]), \
     plt.ylabel("Probability Density")
     data = np.degrees(samples[:,4])
     plt.hist(data,bins = 80,density = True)
+    if TEST == True:
+        plt.axvline(x=inclination_true,c = 'black')
 
 
     plt.figure(903)
@@ -2347,29 +2296,12 @@ def showCorner(samples=np.array([]), \
     data = np.degrees(samples[:,7])
     plt.hist(data,bins = 80,density = True)
     if TEST == True:
-        plt.axvline(x=np.degrees(inclination_true),c = 'black')
-    #n, bins = np.histogram(data, 100)
-    #left = np.array(bins[:-1])
-    #right = np.array(bins[1:])
-    #bottom = np.zeros(len(left))
-    #top = bottom + n
-    #XY = np.array([[left, left, right, right], [bottom, top, top, bottom]]).T
-    #barpath = path.Path.make_compound_path_from_polys(XY)
-    #patch = patches.PathPatch(barpath)
-    #ax.add_patch(patch)
-    #ax.set_xlim(left[0], right[-1])
-    #ax.set_ylim(bottom.min(), top.max())
+        plt.axvline(x=np.degrees(alpha_true),c = 'black')
+
     if loaded == False:
-        plt.savefig('fig_massPosterior.png')
+        plt.savefig(figFolder + '/' + 'fig_massPosterior.png')
     
-    #2D projection of the posterier with 1 of the dimensions set to m1+m2
-    #for i in range(4):
-    #    plt.figure(50+i)
-    #    plt.clf()
-    #    plt.xlabel("Mass")     
-    #    plt.ylabel(varNames[i+2])     
-    #    corner.hist2d(data,samples[:,i+2],bins = 50,levels=[.7,.95])
-    #    plt.savefig('fig_mass_' + lFiles[i+2] + '2D_Posterior.png')
+
 
     plt.figure(60)
     plt.clf()
@@ -2383,17 +2315,10 @@ def showCorner(samples=np.array([]), \
         plt.axvline(x=np.degrees(inclination_true),c = 'black')
         plt.axhline(y=m2_true,c = 'black')
     if loaded == False:
-        plt.savefig('fig_cornerHist_i.png')
+        plt.savefig(figFolder + '/' + 'fig_cornerHist_i.png')
 
 
     
-    #plt.figure(61)
-    #plt.clf()
-    #plt.xlabel(r"$\omega$")
-    #plt.ylabel(varNames[2])
-    #corner.hist2d(np.degrees(samples[:,5]),samples[:,2],bins = 50, \
-    #                  levels=[.68,.95],plot_datapoints = False,smooth = True)
-    #plt.savefig('fig_cornerHist_omega.png')
 
     ### 2018-04-28 WIC - OK here's where we loop through all parameter
     ### combinations... 
@@ -2428,20 +2353,9 @@ def showCorner(samples=np.array([]), \
                 plt.axvline(x=truthsTemp[q],c = 'black')
      
             # save the figure to disk
-            figNam = 'fig_post_%s.png' % (lFiles[q])
+            figNam = figFolder + '/' + 'fig_post_%s.png' % (lFiles[q])
             plt.savefig(figNam)
 
-            #n, bins = np.histogram(data, 50,)
-            #left = np.array(bins[:-1])
-            #right = np.array(bins[1:])
-            #bottom = np.zeros(len(left))
-            #top = bottom + n
-            #XY = np.array([[left, left, right, right], [bottom, top, top, bottom]]).T
-            #barpath = path.Path.make_compound_path_from_polys(XY)
-            #patch = patches.PathPatch(barpath)
-            #ax.add_patch(patch)
-            #ax.set_xlim(left[0], right[-1])
-            #ax.set_ylim(bottom.min(), top.max())
             r = 0
             for r in range(len(varNames)):
 
@@ -2466,7 +2380,7 @@ def showCorner(samples=np.array([]), \
                 plt.scatter(truths[q],truths[r],marker = 's')
     
             ### 2018-04-28 WIC - save the figure to disk
-            figName = 'fig_twoPlot_%s_v_%s.png' % (lFiles[r], lFiles[q])
+            figName = figFolder + '/' + 'fig_twoPlot_%s_v_%s.png' % (lFiles[r], lFiles[q])
             plt.savefig(figName)
             
     if Verbose == True:
@@ -2553,7 +2467,7 @@ def saveRunResults(samples,truths,labels,x_echo,y_echo,\
             'y_err_radial':y_err_radial, 'TEST':TEST, 'lFiles':lFiles}
     pickle.dump(DOut, open(File, 'wb'))
 
-def loadRunResults(plot = True,quickfigs = False):
+def loadRunResults(plot = False,quickfigs = False):
     #Tk().withdraw() # we don't want a full GUI, so keep the root window from appearing
     #filename = askopenfilename() # show an "Open" dialog box and return the path to the selected file
     #print(filename)

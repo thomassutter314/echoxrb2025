@@ -34,6 +34,7 @@ gaussianOne		1.49	0.19
 binaryBoundedOne	0.001	10.1
 binaryBoundedOne	0.0	0.01
 gaussianOne		.15804693	0.05
-binaryBoundedOne	64	74
+binaryBoundedOne	0	90
 binaryBoundedOne	-180	180
 gaussianOne		0.0	1
+binaryBoundedOne	0.0	15
