@@ -1,0 +1,40 @@
+# Initial-guess parameters for 7-parameter fit
+#
+# Useful in cases where we only have a small number of #observations
+#SCO X-1
+1.4
+.7
+.001
+.7873132
+40
+90
+0.1
+0.1
+
+
+#ARA V801
+#1.32
+#0.2
+#.00001
+#.15804693
+#66
+#90.0
+#0.0
+
+
+###1.4
+###1.5
+###.4
+###16.28
+###50
+###0
+###0
+
+#1.35
+#.35
+#.001
+#.15804693
+#72
+#90
+#0
+#.1
