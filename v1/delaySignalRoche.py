@@ -23,14 +23,14 @@ plt.rc('font', family='serif')
 matplotlib.rcParams.update({'font.size': 18})
 
 
-try:
-    funcARY = np.load('Func_Correction.npy')
-    FUNC_CORRECTION = funcARY.item()
-except:
-    print("Pseudo 3D correction is missing. Run: initialPseudoConfig() and restart.")
-    #Attempts to load the corrections for the pseudo 3D model,
-    #if the correction file does not exist, the user must recalibrate the pseudo 3D model
-    #This takes ~1 hour on my system
+# ~ try:
+    # ~ funcARY = np.load('Func_Correction.npy')
+    # ~ FUNC_CORRECTION = funcARY.item()
+# ~ except:
+    # ~ print("Pseudo 3D correction is missing. Run: initialPseudoConfig() and restart.")
+    # ~ #Attempts to load the corrections for the pseudo 3D model,
+    # ~ #if the correction file does not exist, the user must recalibrate the pseudo 3D model
+    # ~ #This takes ~1 hour on my system
 
 
 
@@ -344,18 +344,6 @@ def genDisplacementMap(phase, \
     if RETURN == True:
         return psi, alpha_angle, np.array(vals)
 
-
-
-
-
-
-
-
-
-
-
-
-
     
 
 def genTimeDelayMap(phase, \
@@ -465,7 +453,7 @@ def genTimeDelayMap(phase, \
         sm = mpl.cm.ScalarMappable(cmap=cmap)
         sm.set_array([min(colors),max(colors)])
         ticks = np.linspace(min(colors),max(colors),10)   
-        plt.colorbar(sm,ticks=ticks)
+        plt.colorbar(sm,ax=ax,ticks=ticks)
         #ax.set_title("Time Delay (s)",y=1.15,x = 1.073)
         ax.set_title("Time Delay (s)",y=1.15)
         soa = np.array([[0, 0, 1, 0, 0, 1], [0, 0, 1, np.cos(inclination), np.sin(inclination)*np.cos(theta_ORBIT+omega), -np.sin(inclination)*np.sin(theta_ORBIT+omega)]])
@@ -508,7 +496,7 @@ def genTimeDelayMap(phase, \
         #    ax.view_init(38, angle)
         #    plt.draw()
         #    plt.savefig('m4_l4-%04d.png' % idx)
-        plt.show(block = False)
+        plt.show()
     if RETURN == True:
         return psi, alpha_angle, np.array(vals)
 
@@ -629,7 +617,7 @@ def genApparentIntensityMap(phase, \
         sm = mpl.cm.ScalarMappable(cmap=cmap)
         sm.set_array([min(colors),max(colors)])
         ticks = np.linspace(min(colors),max(colors),10)
-        plt.colorbar(sm,ticks=ticks)
+        plt.colorbar(sm,ax=ax,ticks=ticks)
         ax.set_title("Intensity (Arbitrary Units)",y=1.15)
         soa = np.array([[0, 0, 1, 0, 0, 1], [0, 0, 1, np.cos(inclination), np.sin(inclination)*np.cos(theta_ORBIT+omega), -np.sin(inclination)*np.sin(theta_ORBIT+omega)]])
         X, Y, Z, U, V, W = zip(*soa)
@@ -662,7 +650,7 @@ def genApparentIntensityMap(phase, \
         collec = ax.plot_trisurf(triang, z/max(Rfunc), cmap=cmap, shade=False, linewidth=0.)
         collec.set_array(colors)
         collec.autoscale()
-        plt.show(block = False)
+        plt.show()
     if RETURN == True:
         vals = vals*np.sin(psi)*Rfunc**2 #Jacobian Determinate for Spherical Coordinates
         return psi, alpha_angle, vals
@@ -1031,9 +1019,9 @@ def delaySignalOrbit(N = 10, m1_in = 1.4, m2_in = .7, period_in = .787, \
 
     ttt = np.linspace(0,1,100)
     CORR = np.zeros(len(ttt))
-    TP = simulator_2.timeDelay(ttt, m1_in=m1_in,m2_in=m2_in,period_in=period_in,inclination=inclination, \
-                       omega=omega,eccentricity=eccentricity,radialVelocity=radialVelocity,rocheLobe=True,pseudo3D = True, \
-                               SP_setting = 'egg',alpha=alpha) #Pseudo 3D
+    # ~ TP = simulator_2.timeDelay(ttt, m1_in=m1_in,m2_in=m2_in,period_in=period_in,inclination=inclination, \
+                       # ~ omega=omega,eccentricity=eccentricity,radialVelocity=radialVelocity,rocheLobe=True,pseudo3D = True, \
+                               # ~ SP_setting = 'egg',alpha=alpha) #Pseudo 3D
 
     # 2020-04-23 this call to FUNC (the only one in this method) was
     # commented out. I have inserted some syntax to gracefully handle
@@ -1086,8 +1074,8 @@ def delaySignalOrbit(N = 10, m1_in = 1.4, m2_in = .7, period_in = .787, \
             plt.plot(tt,T1, 'b:',label='CM model')
             plt.plot(tt,T2, 'r--',label='SP model (Egg)')
             plt.plot(tt,T3, 'r-.', label='SP model (Plav)')
-            if p3d == True:
-                plt.plot(ttt,TP, 'k-.',label='Pseudo 3D model')
+            # ~ if p3d == True:
+                # ~ plt.plot(ttt,TP, 'k-.',label='Pseudo 3D model')
             #plt.plot(tt,A*np.array(T1)+B*np.array(T2), 'k-.',label='SCALE{CM model}')
             #plt.plot(tt,fHat*np.array(T1), 'k-.',label='SCALE{CM model}')
             #plt.plot(tt,T4, 'k--',label='Corr')
@@ -1446,20 +1434,6 @@ def corrCoef(yy,q,i,xx = 0):
         
     return xx,yy3
     
-    
-            
-
-
-
-
-
-
-
-
-
-
-
-
 
 def orbitPlot(m1_in = 1.4, m2_in = .7, period_in = .787, omega = np.radians(90.), eccentricity = 0, N = 10):
     period = period_in*constants.day
@@ -1760,7 +1734,7 @@ def polarRocheLobe(m1_in = 1.4,m2_in = 0.7,period_in = .787,Q = 30,N = 30,cmap =
 def delaySignal_burst(phase = .5, m1_in = 1.4, m2_in = .7, period_in = .787, \
                     inclination = np.radians(44.), eccentricity = 0, omega = np.radians(90.), alpha = np.radians(0),\
                     delta = .2, Q = 120, plotAll = True, disk = True, intKind = 'quadratic', \
-                    radialVelocity = False, u = .6, pseudo3DTEST = True, outputData = False, timeScale = 55, Nevals = 10):
+                    radialVelocity = False, u = .6, pseudo3DTEST = True, outputData = False, timeScale = 55, Nevals = 50):
     
     x_burst = np.linspace(-5,30,Nevals)
     y_burst = xRayBurstModel(x_burst)
@@ -1858,7 +1832,7 @@ def delaySignal_burst(phase = .5, m1_in = 1.4, m2_in = .7, period_in = .787, \
             YY_ALL += yy
         if plotAll == True:
             delaySIM2 = np.array(simulator_2.timeDelay([phase],m1_in=m1_in,m2_in=m2_in,eccentricity=eccentricity,period_in=period_in,inclination=inclination, \
-                                               omega=omega,radialVelocity=radialVelocity, pseudo3D = pseudo3DTEST))
+                                               omega=omega,radialVelocity=radialVelocity, pseudo3D = False))
             #Add time that has lapsed from t=0 (start of burst) to echo delay time
             delaySIM2 += x_burst[zeta]
             #print("delaySIM2",delaySIM2)
@@ -1893,7 +1867,7 @@ def delaySignal_burst(phase = .5, m1_in = 1.4, m2_in = .7, period_in = .787, \
     plt.figure(502)
     plt.plot(tt,YY_ALL,'g-',label='Echo Response')
     delaySIM2 = np.array(simulator_2.timeDelay([phase],m1_in=m1_in,m2_in=m2_in,eccentricity=eccentricity,period_in=period_in,inclination=inclination, \
-                                               omega=omega,radialVelocity=radialVelocity, pseudo3D = pseudo3DTEST))
+                                               omega=omega,radialVelocity=radialVelocity, pseudo3D = False))
     plt.axvline(x=delaySIM2,c='black',label='Pseudo 3D')
     plt.plot(x_burst,y_burst,'r-',label='X-ray burst')
     plt.scatter(x_burst,y_burst)
@@ -2017,5 +1991,10 @@ def figure_1(N = 10, m1_in = 1.4, m2_in = .7, period_in = .787, \
     plt.legend()
     
     
-    
-    
+# ~ from simulator_2 import timeDelay
+# ~ figure_1()
+# ~ plt.show()
+
+# ~ genTimeDelayMap(0.5)
+# ~ delaySignalOrbit()
+delaySignal_burst()
