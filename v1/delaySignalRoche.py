@@ -1435,7 +1435,7 @@ def corrCoef(yy,q,i,xx = 0):
     return xx,yy3
     
 
-def orbitPlot(m1_in = 1.4, m2_in = .7, period_in = .787, omega = np.radians(90.), eccentricity = 0, N = 10):
+def orbitPlot(m1_in = 1.4, m2_in = 0.1, period_in = .787, omega = np.radians(90.), eccentricity = 0, N = 10):
     period = period_in*constants.day
     m1 = m1_in * constants.M_Sun
     m2 = m2_in * constants.M_Sun
@@ -1469,13 +1469,18 @@ def orbitPlot(m1_in = 1.4, m2_in = .7, period_in = .787, omega = np.radians(90.)
     for i, txt in enumerate(n):
         ax.annotate(txt, (B1[i],B2[i]))
     plt.show()
-def generateRochePotential(m1_in = 1.4,m2_in = .7,period_in = .787,FAC=3,N=280, plot = True):
+def generateRochePotential(m1_in = 2,m2_in = 1,period_in = .787,FAC=3,N=280, plot = True):
     m1 = m1_in*constants.M_Sun
     m2 = m2_in*constants.M_Sun
     q = m2_in/m1_in
     P = period_in*constants.day
     omega = 2*np.pi/P
     G = constants.G
+    a = (G*(m1+m2)*P**2/(4*np.pi**2))**(1/3)
+    
+    L2 = (a*(.5+.227*np.log(q)/np.log(10)))
+    
+    
     S = (G*(m1+m2)*P**2/(4*np.pi**2))**(1/3)
     radiusDonor = S*(.49*q**(.667))/(.6*q**(.667)+np.log(1+q**(.333)))
     rPre = np.linspace(0, 1.5*S, 500)
@@ -1498,7 +1503,7 @@ def generateRochePotential(m1_in = 1.4,m2_in = .7,period_in = .787,FAC=3,N=280, 
     fig = plt.figure()
     ax = fig.add_subplot(111,projection = '3d')
     ax.plot_surface(X, Y, phi, cmap=plt.cm.cool)
-    #ax.set_zlim(-.1*10**13, 0)
+    ax.set_zlim(-.02*10**13, 0)
     ax.set_xlabel(r'$x(m)$')
     ax.set_ylabel(r'$y(m)$')
     ax.set_zlabel(r'$\phi$')
@@ -1509,7 +1514,14 @@ def generateRochePotential(m1_in = 1.4,m2_in = .7,period_in = .787,FAC=3,N=280, 
     circle = plt.Circle((m1/(m1+m2)*S,0),radiusDonor,color='b', fill=True, alpha = .5)
     plt.gcf().gca().add_artist(circle)
     plt.contour(X,Y,phi,N,zorder=1)
+    plt.scatter([L2],[0],label='plavec')
     plt.show(block = False)
+    
+    fig, ax = plt.subplots()
+    ax.imshow(phi, cmap=plt.cm.cool)
+    plt.show()
+    
+    
 def polarRocheLobe(m1_in = 1.4,m2_in = 0.7,period_in = .787,Q = 30,N = 30,cmap = cm.jet,plot = True):
     m1 = m1_in*constants.M_Sun
     m2 = m2_in*constants.M_Sun
@@ -1598,11 +1610,15 @@ def polarRocheLobe(m1_in = 1.4,m2_in = 0.7,period_in = .787,Q = 30,N = 30,cmap =
     #plt.scatter([0],[0])
     plt.plot(r*np.cos(theta),r*np.sin(theta),'k-',label = 'Roche Lobe')
     plt.plot(R_Eggleton*np.cos(theta),R_Eggleton*np.sin(theta),'g--', label = 'Eggleton Radius')
+    plt.scatter([L2],[0],label='plavec')
     plt.legend()
     #plt.plot(R_Lagrange*np.cos(theta),R_Lagrange*np.sin(theta),'k--')
 
+# ~ polarRocheLobe()
 
-    
+generateRochePotential()
+
+# ~ generateRochePotential()
 #def polar3DRocheLobe(phase, \
 #                  m1_in=1.4, m2_in=0.7, period_in=.787, eccentricity = 0,\
 #                  inclination=np.radians(44.), omega=np.radians(90.), cmap = cm.cool, plot = True, Q = 25, RETURN = False):
@@ -1997,4 +2013,4 @@ def figure_1(N = 10, m1_in = 1.4, m2_in = .7, period_in = .787, \
 
 # ~ genTimeDelayMap(0.5)
 # ~ delaySignalOrbit()
-delaySignal_burst()
+m2MidPointVary()

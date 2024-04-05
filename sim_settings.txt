@@ -1,6 +1,0 @@
-lattice_size:51
-particle_number:500
-initial_temp:1.5
-final_temp:0.0
-cooling_rate:1.0
-iterations_per_plot:10000
