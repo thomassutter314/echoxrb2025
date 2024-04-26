@@ -918,7 +918,7 @@ def load_and_interp_munoz_darias():
         axs[i_index].plot(q, k_corr_egg, 'k-.', label =  'SP Plavec')
         
         axs[i_index].set_xlabel(r'$q=m_2/m_1$')
-        axs[i_index].set_ylabel(r'$K_{\text{corr}}$')
+        axs[i_index].set_ylabel(r'$K_corr$')
         axs[i_index].legend()
         axs[i_index].set_title(f'inclination = {inclination_in} deg')
         axs[i_index].set_ylim([-.1,1.25])
@@ -1183,7 +1183,7 @@ def timeDelay_radialVelocity_3d(phase, \
         return centroid_delays, centroid_radial_velocity
 
 
-
+# ~ load_and_interp_munoz_darias()
 
 # ~ calibrate_asra(mode='plot')
     # ~ print(alphas)

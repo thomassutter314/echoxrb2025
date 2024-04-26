@@ -2,9 +2,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import cm
 import matplotlib.image as image
+from matplotlib.collections import LineCollection
 from matplotlib import patches
+import matplotlib.tri as mtri
+import matplotlib as mpl
 import scipy.optimize as opt
 import pickle
+import corner
 
 from matplotlib import rcParams
 rcParams.update({'figure.autolayout': True})
@@ -20,8 +24,48 @@ plt.rc('ytick', labelsize=12)    # fontsize of the tick labels
 plt.rc('legend', fontsize=12)    # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)
 
+from mcmc_fitting import MCMC_manager, Priors
 import constants
 import delay_model
+
+
+
+def multiline(xs, ys, c, ax=None, **kwargs):
+    """Plot lines with different colorings
+
+    Parameters
+    ----------
+    xs : iterable container of x coordinates
+    ys : iterable container of y coordinates
+    c : iterable container of numbers mapped to colormap
+    ax (optional): Axes to plot on.
+    kwargs (optional): passed to LineCollection
+
+    Notes:
+        len(xs) == len(ys) == len(c) is the number of line segments
+        len(xs[i]) == len(ys[i]) is the number of points for each line (indexed by i)
+
+    Returns
+    -------
+    lc : LineCollection instance.
+    """
+
+    # find axes
+    ax = plt.gca() if ax is None else ax
+
+    # create LineCollection
+    segments = [np.column_stack([x, y]) for x, y in zip(xs, ys)]
+    lc = LineCollection(segments, **kwargs)
+
+    # set coloring of line segments
+    #    Note: I get an error if I pass c as a list here... not sure why.
+    lc.set_array(np.asarray(c))
+
+    # add lines to axes and rescale 
+    #    Note: adding a collection doesn't autoscalee xlim/ylim
+    ax.add_collection(lc)
+    ax.autoscale()
+    return lc
 
 def plot1(inclination_in = 90):
     phases = np.linspace(0,1,1000)
@@ -121,7 +165,7 @@ def plot2(m1_in = 1.4, m2_in = 1.3, inclination_in = 45, period_in=.787):
     plt.show()
     
 def plot3A(m1_in = 1, inclination_in = 90):
-    data_dir = r'C:\Users\thoma\Documents\GitHub\echoxrb\data\mz_data'
+    data_dir = r'C:\Users\thoma\OneDrive\Documents\GitHub\echoxrb\data\mz_data'
     m2_in = 0.6*m1_in
     period_in = 1.5
     phases = np.linspace(0,1,20)
@@ -130,28 +174,28 @@ def plot3A(m1_in = 1, inclination_in = 90):
     scale = 1
     
     for i in range(len(phases)):
-        vv_3d[i] = delay_model.timeDelay_3d_full(phases[i], plot = False, Q = 100, m1_in = m1_in, m2_in = m2_in, inclination_in = inclination_in, disk_angle_in = 0, period_in = period_in)
+        vv_3d[i] = delay_model.timeDelay_3d_full(phases[i], mode = 'rv', Q = 100, m1_in = m1_in, m2_in = m2_in, inclination_in = inclination_in, disk_angle_in = 0, period_in = period_in)
     plt.plot(phases,vv_3d*scale)
     
     data = np.loadtxt(f"{data_dir}//alpha0.txt")
     plt.scatter(data[:,0],data[:,1],label=r'$\alpha$ = 0')
     
     for i in range(len(phases)):
-        vv_3d[i] = delay_model.timeDelay_3d_full(phases[i], plot = False, Q = 50, m1_in = m1_in, m2_in = m2_in, inclination_in = inclination_in, disk_angle_in = 8, period_in = period_in)
+        vv_3d[i] = delay_model.timeDelay_3d_full(phases[i], mode = 'rv', Q = 50, m1_in = m1_in, m2_in = m2_in, inclination_in = inclination_in, disk_angle_in = 8, period_in = period_in)
     plt.plot(phases,vv_3d*scale)
     
     data = np.loadtxt(f"{data_dir}//alpha8.txt")
     plt.scatter(data[:,0],data[:,1],label=r'$\alpha$ = 8')
     
     for i in range(len(phases)):
-        vv_3d[i] = delay_model.timeDelay_3d_full(phases[i], plot = False, Q = 50, m1_in = m1_in, m2_in = m2_in, inclination_in = inclination_in, disk_angle_in = 14, period_in = period_in)
+        vv_3d[i] = delay_model.timeDelay_3d_full(phases[i], mode = 'rv', Q = 50, m1_in = m1_in, m2_in = m2_in, inclination_in = inclination_in, disk_angle_in = 14, period_in = period_in)
     plt.plot(phases,vv_3d*scale)
     
     data = np.loadtxt(f"{data_dir}//alpha14.txt")
     plt.scatter(data[:,0],data[:,1],label=r'$\alpha$ = 14')
     
     for i in range(len(phases)):
-        vv_3d[i] = delay_model.timeDelay_3d_full(phases[i], plot = False, Q = 50, m1_in = m1_in, m2_in = m2_in, inclination_in = inclination_in, disk_angle_in = 18, period_in = period_in)
+        vv_3d[i] = delay_model.timeDelay_3d_full(phases[i], mode = 'rv', Q = 50, m1_in = m1_in, m2_in = m2_in, inclination_in = inclination_in, disk_angle_in = 18, period_in = period_in)
     plt.plot(phases,vv_3d*scale)
     
     data = np.loadtxt(f"{data_dir}//alpha18.txt")
@@ -163,7 +207,7 @@ def plot3A(m1_in = 1, inclination_in = 90):
     plt.show()
 
 def plot3B(m1_in = 1.5):
-    data_dir = r'C:\Users\thoma\Documents\GitHub\echoxrb\data\mz_data'
+    data_dir = r'C:\Users\thoma\OneDrive\Documents\GitHub\echoxrb\data\mz_data'
     m2_in = 0.6*m1_in
     period_in = 0.60
     phases = np.linspace(0,1,20)
@@ -172,21 +216,21 @@ def plot3B(m1_in = 1.5):
     scale = 0.9
     
     for i in range(len(phases)):
-        vv_3d[i] = delay_model.timeDelay_3d_full(phases[i], plot = False, Q = 100, m1_in = m1_in, m2_in = m2_in, inclination_in = 90, disk_angle_in = 0, period_in = period_in)
+        vv_3d[i] = delay_model.timeDelay_3d_full(phases[i], mode = 'rv', Q = 100, m1_in = m1_in, m2_in = m2_in, inclination_in = 90, disk_angle_in = 0, period_in = period_in)
     plt.plot(phases,vv_3d*scale)
     
     data = np.loadtxt(f"{data_dir}//i90.txt")
     plt.scatter(data[:,0],data[:,1],label=r'i = 90')
     
     for i in range(len(phases)):
-        vv_3d[i] = delay_model.timeDelay_3d_full(phases[i], plot = False, Q = 100, m1_in = m1_in, m2_in = m2_in, inclination_in = 40, disk_angle_in = 0, period_in = period_in)
+        vv_3d[i] = delay_model.timeDelay_3d_full(phases[i], mode = 'rv', Q = 100, m1_in = m1_in, m2_in = m2_in, inclination_in = 40, disk_angle_in = 0, period_in = period_in)
     plt.plot(phases,vv_3d*scale)
     
     data = np.loadtxt(f"{data_dir}//i40.txt")
     plt.scatter(data[:,0],100*data[:,1],label=r'i = 40')
     
     for i in range(len(phases)):
-        vv_3d[i] = delay_model.timeDelay_3d_full(phases[i], plot = False, Q = 100, m1_in = m1_in, m2_in = m2_in, inclination_in = 20, disk_angle_in = 0, period_in = period_in)
+        vv_3d[i] = delay_model.timeDelay_3d_full(phases[i], mode = 'rv', Q = 100, m1_in = m1_in, m2_in = m2_in, inclination_in = 20, disk_angle_in = 0, period_in = period_in)
     plt.plot(phases,vv_3d*scale)
     
     data = np.loadtxt(f"{data_dir}//i20.txt")
@@ -410,7 +454,7 @@ def plot7(m2_in = 0.7, m1_in = 1.4, period_in = 0.1):
     plt.legend()
     plt.show()
 
-def fig8(inclination_in = 90, disk_angle_in = 17.5, m2_in = 0.7, m1_in = 1.4, period_in = 0.787):
+def plot8(inclination_in = 90, disk_angle_in = 17.5, m2_in = 0.7, m1_in = 1.4, period_in = 0.787):
     phases = np.linspace(0,1,50)
     yy_3d_asra = np.zeros(len(phases))
     yy_cm = delay_model.radialVelocity(phases,setting='cm',inclination_in = inclination_in)
@@ -452,10 +496,49 @@ def fig8(inclination_in = 90, disk_angle_in = 17.5, m2_in = 0.7, m1_in = 1.4, pe
     
     plt.show()
 
+def plot9():
+    asra_lt = delay_model.ASRA_LT_model()
+    
+    Q = np.linspace(0.1,1,15)**3
+    kcorr = np.empty(len(Q))
+    tcorr_max = np.empty(len(Q))
+    tcorr_min = np.empty(len(Q))
+    
+    disk_angle_in = 0
+    M_in = 2
+    
+    for qi in range(len(Q)):
+        m1_in = M_in/(1+Q[qi])
+        m2_in = Q[qi]*m1_in
+        _, Kem = asra_lt.evaluate(0.75, m1_in = m1_in, m2_in = m2_in, disk_angle_in = disk_angle_in)
+        Tem_max, _ = asra_lt.evaluate(0.5, m1_in = m1_in, m2_in = m2_in, disk_angle_in = disk_angle_in)
+        Tem_min, _ = asra_lt.evaluate(0, m1_in = m1_in, m2_in = m2_in, disk_angle_in = disk_angle_in)
+        K2 = delay_model.radialVelocity(0.75, m1_in = m1_in, m2_in = m2_in)
+        T2_max = delay_model.timeDelay_sp(0.5, m1_in = m1_in, m2_in = m2_in, setting = 'cm')
+        T2_min = delay_model.timeDelay_sp(0, m1_in = m1_in, m2_in = m2_in, setting = 'cm')
+        
+        kcorr[qi] = Kem/K2
+        tcorr_max[qi] = Tem_max/T2_max
+        tcorr_min[qi] = Tem_min/T2_min
+
+    plt.scatter(Q,kcorr,label = r'$\kappa$')
+    
+    plt.scatter(Q,tcorr_max,label = r'$\tau_max$')
+    plt.scatter(Q,tcorr_min,label = r'$\tau_min$')
+    
+    
+    
+    xx = np.linspace(0,1,100)
+    yy = 0.5/(0.5+xx)
+    
+    plt.plot(xx,yy)
+    
+
+    plt.legend()
+    plt.show()
 
 
-
-def figA(inclination_in = 45, disk_angle_in = 0, m2_in = 0.5*1.4, m1_in = 1.4, period_in = 0.787):
+def fig1A(inclination_in = 45, disk_angle_in = 0, m2_in = 0.5*1.4, m1_in = 1.4, period_in = 0.787):
     phases = np.linspace(0,1,50)
     yy_3d_asra = np.zeros(len(phases))
     yy_cm = delay_model.timeDelay_sp(phases,setting='cm',inclination_in = inclination_in)
@@ -495,7 +578,7 @@ def figA(inclination_in = 45, disk_angle_in = 0, m2_in = 0.5*1.4, m1_in = 1.4, p
     
     plt.show()
 
-def figB(inclination_in = 2.5, disk_angle_in = 0, m2_in = 0.5*1.4, m1_in = 1.4, period_in = 0.787):
+def fig1B(inclination_in = 2.5, disk_angle_in = 0, m2_in = 0.5*1.4, m1_in = 1.4, period_in = 0.787):
     phases = np.linspace(0,1,50)
     yy_3d_asra = np.zeros(len(phases))
     yy_cm = delay_model.radialVelocity(phases,setting='cm',inclination_in = inclination_in)
@@ -536,7 +619,7 @@ def figB(inclination_in = 2.5, disk_angle_in = 0, m2_in = 0.5*1.4, m1_in = 1.4, 
     
     plt.show()
 
-def figC(m2_in = 0.7, m1_in = 1.4, period_in = 0.787, inclination_in = 44):
+def fig1C(m2_in = 0.7, m1_in = 1.4, period_in = 0.787, inclination_in = 44):
     Q = 500
     
     inclination = inclination_in*np.pi/180
@@ -653,11 +736,431 @@ def figC(m2_in = 0.7, m1_in = 1.4, period_in = 0.787, inclination_in = 44):
     plt.xlim([-L,1.2*a])
     plt.ylim([-L,L])
     ax.set_aspect('equal')
+    
+    ax.set_axis_off()
+    
     # ~ plt.legend()
     plt.show()
 
+def fig1D(phase = 0.65, m2_in = 0.7, m1_in = 1.4, period_in = 0.787, inclination_in = 44, disk_angle_in = 5, mode = 'plot', Q = 100):
+    # ~ print(phase,m1_in,m2_in,inclination_in,disk_angle_in)
+    # Convert to SI units
+    m1 = m1_in * constants.M_Sun
+    m2 = m2_in * constants.M_Sun
+    inclination = inclination_in*np.pi/180
+    disk_angle = disk_angle_in*np.pi/180
+    
+    q = m2_in/m1_in
+    
+    period = period_in * constants.day
+    # Compute the orbital semi-major axis
+    a = (constants.G*(m1+m2)*period**2/(4*np.pi**2))**(1/3)
+    r2 = m1/(m1+m2)*a
+    
+    # Compute the location of the L1 Lagrange point
+    roots = np.roots([(2*np.pi/period)**2,-r2*(2*np.pi/period)**2-2*a*(2*np.pi/period)**2,2*a*r2*(2*np.pi/period)**2 + a**2*(2*np.pi/period)**2,constants.G*(m1-m2)-r2*(2*np.pi/period)**2*a**2,2*a*constants.G*m2,-a**2*constants.G*m2])
+    L1 = np.real(roots[np.argmin(np.abs(np.imag(roots)))]) # There should only be one purely real solution in the 5 complex solutions, use that one
+    
+    # Compute the value of the effective gravitational potential at the L1 point
+    potential_at_L1 = delay_model.rochePotential(L1,psi=0,beta=0,m1=m1,m2=m2,period=period)
+    
+    # Make an array of polar coordinates for constructing the Roche Lobe, if not plotting speed up by dropping the bottom half of the Roche lobe
+    if mode == 'plot':
+        psi_roche = np.linspace(0, np.pi, num=Q, endpoint=True)
+    else:
+        psi_roche = np.linspace(0, np.pi/2, num=Q, endpoint=True)
+        
+    r_roche = np.zeros(len(psi_roche))
+       
+    # Azimuthal angle for the Roche Lobe
+    beta_roche = np.linspace(0, 2*np.pi, num=Q, endpoint=True)
+    
+    # Make a meshgrid of the polar angles
+    PSI_roche, BETA_roche = np.meshgrid(psi_roche, beta_roche)
+    R_roche = np.tile(r_roche, (len(beta_roche),1))
+    # Now we unravel this into 1D arrays
+    R_roche, PSI_roche, BETA_roche = R_roche.ravel(), PSI_roche.ravel(), BETA_roche.ravel()
+    
+    # numerically solve the equation V(p2,psi,beta) = V(L1) for p2 given psi and beta. Then loop over all psi and beta to construct the full lobe
+    for i in range(len(R_roche)):
+        R_roche[i] = opt.brentq(delay_model.rochePotential,L1*1e-3,L1,args=(PSI_roche[i],BETA_roche[i],m1,m2,period,potential_at_L1),maxiter=100)
+    
+    # Distance from points on surface of Roche lobe to compact object
+    P1 = np.sqrt(R_roche**2 + a**2 - 2*R_roche*a*np.cos(PSI_roche))
+    
+    # Angle between p2 (vector from cm of donor to point on surface) and e (vector from cm of binary system to earth)
+    p2hat_dot_ehat = -np.cos(PSI_roche)*np.sin(inclination)*np.cos(2*np.pi*phase) +\
+                  -np.sin(PSI_roche)*np.sin(BETA_roche)*np.sin(inclination)*np.sin(2*np.pi*phase) +\
+                  +np.sin(PSI_roche)*np.cos(BETA_roche)*np.cos(inclination)
+                  
+    # Angle between psi_hat and e (psi_hat is the polar unit vector in the spherical coordinate system where p2 is the radial coordinate)
+    psihat_dot_ehat = np.sin(PSI_roche)*np.sin(inclination)*np.cos(2*np.pi*phase) +\
+              -np.cos(PSI_roche)*np.sin(BETA_roche)*np.sin(inclination)*np.sin(2*np.pi*phase) +\
+              +np.cos(PSI_roche)*np.cos(BETA_roche)*np.cos(inclination)
+    
+    # Compute the delay times across the Roche Lobe
+    delays = P1 - a*np.cos(2*np.pi*phase)*np.sin(inclination) - R_roche * p2hat_dot_ehat
+    
+    delays = delays/constants.c
+    
+    # Compute the radial velocity over the Roche Lobe
+    radial_velocity = -1*(2*np.pi/period)*np.sin(inclination)*(R_roche*np.sin(PSI_roche)*np.sin(BETA_roche)*np.cos(2*np.pi*phase) + (r2-R_roche*np.cos(PSI_roche))*np.sin(2*np.pi*phase))
+    # Convert the radial velocity to km/s from m/s
+    radial_velocity *= 1e-3
+    
+    #################################
+    # Now let's compute the apparent intensity over the Roche Lobe, we have 3 terms A1, A2, and A3
+    
+    #Let's compute A1: Distance Attenuation
+    A1 = P1**(-2)
+    
+    # We will implement the disk shielding angle here by taking all values of A1A2 corresponding to angles below the shielding angle to zero
+    A1[R_roche/P1*np.abs(np.sin(PSI_roche)*np.cos(BETA_roche)) < np.sin(disk_angle)] = 0
+    
+    #Let's compute A2: Projected area on surface of donor towards accretor
+    
+    # First we need to compute vectors normal to the Roche Lobe surface via a gradient of the potential function
+    vecs_normal_roche = delay_model.polarGradRochePotential(R_roche,PSI_roche,BETA_roche,m1,m2,period)# returns dV/dp2 vec(p2) + 1/p2*dV/dpsi vec(psi)
+    
+    # Manage special case of psi = 0 where the gradient function can spuriously evaluate to zero
+    psi_zero_indices = (PSI_roche == 0)
+    vecs_normal_roche[0,psi_zero_indices] = 1
+    vecs_normal_roche[1,psi_zero_indices] = 0
+    
+    # Normalize the vectors to 1
+    vecs_normal_roche = vecs_normal_roche/np.sqrt(vecs_normal_roche[0]**2+vecs_normal_roche[1]**2)
 
+    # Take a normalized dot product of roche normal with the -p1 vector (p1 points from accretor to point on surface of donor)
+    A2 = (vecs_normal_roche[0]*(a*np.cos(PSI_roche)-R_roche) - vecs_normal_roche[1]*a*np.sin(PSI_roche)) \
+         /(np.sqrt(R_roche**2 + a**2 - 2*R_roche*a*np.cos(PSI_roche)))
+    A2[A2<0] = 0 # Make strictly positive or zero
+    
+    #Let's compute A3: Projected area on surface of donor towards observer
+    A3 = vecs_normal_roche[0] * p2hat_dot_ehat + vecs_normal_roche[1] * psihat_dot_ehat
+    A3[A3<0] = 0 # Make strictly positive or zero
 
+    T_0 = 10
+    apparent_intensities = T_0*A1*A2*A3
+    
+    if np.sum(R_roche**2*np.sin(PSI_roche)*apparent_intensities) != 0:
+        # The Jacobian is sin(psi)*R**2
+        centroid_delays = np.average(delays,weights=R_roche**2*np.sin(PSI_roche)*apparent_intensities) # Compute the centroid of the distribution of delay times weighted to the intensities
+        centroid_beta = 180/np.pi*np.arcsin(np.sqrt(np.average(np.sin(BETA_roche)**2,weights=R_roche**2*np.sin(PSI_roche)*apparent_intensities)))
+        centroid_rv = np.average(radial_velocity,weights=R_roche**2*np.sin(PSI_roche)*apparent_intensities)
+    else:
+        centroid_delays = 0
+        centroid_beta = 0
+        centroid_rv = 0
+    
+    if mode == 'plot':
+        pview, aview = 10, 99
+        
+        x, y, z = R_roche*np.cos(BETA_roche)*np.sin(PSI_roche), R_roche*np.sin(BETA_roche)*np.sin(PSI_roche), R_roche*np.cos(PSI_roche)
+        
+        mesh_x, mesh_y = (PSI_roche, BETA_roche)
+        triangles = mtri.Triangulation(mesh_y, mesh_x).triangles
+        
+        # Plotting
+        fig = plt.figure()
+        
+        # Make the delays subplot
+        cmap = cm.cool
+        ax = fig.add_subplot(1,1,1, projection='3d')
+        ax.set_axis_off()
+        ax.set_xlim3d(-1,1)
+        ax.set_ylim3d(-1,1)
+        ax.set_zlim3d(-1,1)
+        #Calculation of time delay at many points over the surface of the star
+        colors = np.mean(delays[triangles], axis=1)
+        sm = mpl.cm.ScalarMappable(cmap=cmap)
+        sm.set_array([min(colors),max(colors)])
+        ticks = np.linspace(min(colors),max(colors),10)   
+        cbar = plt.colorbar(sm,ax=ax,ticks=ticks,shrink=0.5, label = "Time Delay (s)")
+        # ~ ax.set_title("Time Delay (s)",y=1.15)
+        soa = np.array([[0, 0, 1, 0, 0, 1], [0, 0, 1, np.cos(inclination), -np.sin(inclination)*np.sin(2*np.pi*phase), -np.sin(inclination)*np.cos(2*np.pi*phase)]])
+        X, Y, Z, U, V, W = zip(*soa)
+        param1 = .75
+        U = np.array(U)
+        V = np.array(V)
+        W = np.array(W)
+        U,V,W = param1*U,param1*V,param1*W
+        labels = ['Accretor', 'Observer']
+        for i in range(len(labels)):
+            ax.text(X[i]+U[i], Y[i]+V[i], Z[i]+W[i], labels[i])
+        quiv = ax.quiver(X, Y, Z, U, V, W)
+        
+        triang = mtri.Triangulation(x/max(R_roche), y/max(R_roche), triangles)
+        collec = ax.plot_trisurf(triang, z/max(R_roche), cmap=cmap, shade=False, linewidth=0.)
+        collec.set_array(colors)
+        collec.autoscale()
+        ax.view_init(pview, aview)
+        
+        # Make the radial velocity subplot
+        cmap = cm.jet
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1, projection='3d')
+        ax.set_axis_off()
+        ax.set_xlim3d(-1,1)
+        ax.set_ylim3d(-1,1)
+        ax.set_zlim3d(-1,1)
+        #Calculation of time delay at many points over the surface of the star
+        colors = np.mean(radial_velocity[triangles], axis=1)
+        sm = mpl.cm.ScalarMappable(cmap=cmap)
+        sm.set_array([min(colors),max(colors)])
+        ticks = np.linspace(min(colors),max(colors),10)   
+        cbar = plt.colorbar(sm,ax=ax,ticks=ticks,shrink=0.5,label = 'Radial Velocity (km/s)')
+        # ~ ax.set_title("Radial Velocity (km/s)",y=1.15)
+        soa = np.array([[0, 0, 1, 0, 0, 1], [0, 0, 1, np.cos(inclination), -np.sin(inclination)*np.sin(2*np.pi*phase), -np.sin(inclination)*np.cos(2*np.pi*phase)]])
+        X, Y, Z, U, V, W = zip(*soa)
+        param1 = .75
+        U = np.array(U)
+        V = np.array(V)
+        W = np.array(W)
+        U,V,W = param1*U,param1*V,param1*W
+        labels = ['Accretor', 'Observer']
+        for i in range(len(labels)):
+            ax.text(X[i]+U[i], Y[i]+V[i], Z[i]+W[i], labels[i])
+        quiv = ax.quiver(X, Y, Z, U, V, W)
+        
+        triang = mtri.Triangulation(x/max(R_roche), y/max(R_roche), triangles)
+        collec = ax.plot_trisurf(triang, z/max(R_roche), cmap=cmap, shade=False, linewidth=0.)
+        collec.set_array(colors)
+        collec.autoscale()
+        ax.view_init(pview, aview)
+        
+        # Make the intensity subplot
+        cmap = cm.hot
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1, projection='3d')
+        ax.set_axis_off()
+        ax.set_xlim3d(-1,1)
+        ax.set_ylim3d(-1,1)
+        ax.set_zlim3d(-1,1)
+        #Calculation of time delay at many points over the surface of the star
+        colors = np.mean(apparent_intensities[triangles], axis=1)
+        sm = mpl.cm.ScalarMappable(cmap=cmap)
+        sm.set_array([min(colors),max(colors)])
+        ticks = np.linspace(min(colors),max(colors),10)   
+        cbar = plt.colorbar(sm,ax=ax,ticks=ticks,shrink=0.5, label = 'Apparent Intensity')
+        
+        # ~ ax.set_title("Apparent Intensity",y=1.15)
+        soa = np.array([[0, 0, 1, 0, 0, 1], [0, 0, 1, np.cos(inclination), -np.sin(inclination)*np.sin(2*np.pi*phase), -np.sin(inclination)*np.cos(2*np.pi*phase)]])
+        X, Y, Z, U, V, W = zip(*soa)
+        param1 = .75
+        U = np.array(U)
+        V = np.array(V)
+        W = np.array(W)
+        U,V,W = param1*U,param1*V,param1*W
+        labels = ['Accretor', 'Observer']
+        for i in range(len(labels)):
+            ax.text(X[i]+U[i], Y[i]+V[i], Z[i]+W[i], labels[i])
+        quiv = ax.quiver(X, Y, Z, U, V, W)
+        
+        triang = mtri.Triangulation(x/max(R_roche), y/max(R_roche), triangles)
+        collec = ax.plot_trisurf(triang, z/max(R_roche), cmap=cmap, shade=False, linewidth=0.)
+        collec.set_array(colors)
+        collec.autoscale()
+        ax.view_init(pview, aview)
+        
+        q = m2/m1
+        egg_radiusDonor = a*(.49*q**(.667))/(.6*q**(.667)+np.log(1+q**(.333)))
+        egg_volume = 4/3*np.pi*egg_radiusDonor**3
+        # ~ fig.suptitle(f'Roche Lobe Volume: {1/3*np.sum(vecs_normal_roche[0]*R_roche**3*np.sin(PSI_roche))*(np.pi/Q)*(2*np.pi/Q)} m^3 \n Eggleton Volume = {egg_volume} m^3 \n Centroid Beta = {centroid_beta} deg \n Centroid Delay = {centroid_delays} s')
+
+        # Make a new plot showing the observed intensity vs. time delay
+        fig, axs = plt.subplots(1,2)
+        # Here we can scale the apparent intensities by the spherical coordinate system Jacobian
+        observed_intensities = (R_roche)**2*np.sin(PSI_roche)*apparent_intensities
+        
+        args = delays.argsort()
+        delays = delays[args]
+        observed_intensities = observed_intensities[args]
+        
+        block_size = 2*Q
+        delays_reshaped = delays.reshape(-1, block_size)
+        observed_intensities_reshaped = observed_intensities.reshape(-1, block_size)
+        # Sum along the rows (axis=1) of the reshaped array
+        delays_binned = np.mean(delays_reshaped, axis=1)
+        observed_intensities_binned = np.mean(observed_intensities_reshaped, axis=1)
+        
+        axs[0].scatter(delays, observed_intensities,s=3)
+        axs[0].scatter(delays_binned, observed_intensities_binned,label='binned')
+        axs[0].axvline(x=centroid_delays,c='black',label=f'centorid = {round(centroid_delays,2)} s',linestyle='--')
+        axs[0].set_xlabel('Time Delay (s)')
+        axs[0].set_ylabel('Observed Intensity (a.u.)')
+        
+        observed_intensities = (R_roche)**2*np.sin(PSI_roche)*apparent_intensities
+        
+        args = radial_velocity.argsort()
+        radial_velocity = radial_velocity[args]
+        observed_intensities = observed_intensities[args]
+        
+        block_size = 2*Q
+        radial_velocity_reshaped = radial_velocity.reshape(-1, block_size)
+        observed_intensities_reshaped = observed_intensities.reshape(-1, block_size)
+        # Sum along the rows (axis=1) of the reshaped array
+        radial_velocity_binned = np.mean(radial_velocity_reshaped, axis=1)
+        observed_intensities_binned = np.mean(observed_intensities_reshaped, axis=1)
+        
+        axs[1].scatter(radial_velocity, observed_intensities,s=3)
+        axs[1].scatter(radial_velocity_binned, observed_intensities_binned,label='binned')
+        axs[1].axvline(x=centroid_rv,c='black',label=f'centorid = {round(centroid_rv,2)} km/s',linestyle='--')
+        axs[1].set_xlabel('Radial Velocity (km/s)')
+        axs[1].set_ylabel('Observed Intensity (a.u.)')
+        
+        plt.legend()
+        plt.show()
+        
+
+def fig2():
+    echo = '1712124156'
+    rv = '1712125465'
+    both = '1712128213'
+    
+    alpha = 0.2
+    s = 1
+    
+    with open(f'mcmc_results//{rv}//sampler.pickle', 'rb') as inp:
+        sampler = pickle.load(inp)
+    samples1 = sampler.get_chain(discard=50, thin=5, flat=True)
+    # ~ plt.scatter(samples[:,2],samples[:,1]/samples[:,0], s = s, alpha = alpha, label = 'radial velocity only', c = 'red')
+    corner.hist2d(samples1[:,2],samples1[:,1]/samples1[:,0], levels=[0.393,0.865], smooth = True,\
+                  plot_datapoints = False, color = 'red', alpha = alpha, label = 'radial velocity only', no_fill_contours = True, plot_density = True)
+    
+    with open(f'mcmc_results//{echo}//sampler.pickle', 'rb') as inp:
+        sampler = pickle.load(inp)
+    samples2 = sampler.get_chain(discard=50, thin=5, flat=True)
+    # ~ plt.scatter(samples[:,2],samples[:,1]/samples[:,0], s = s, alpha = alpha, label = 'echo delay only', c = 'blue')
+    corner.hist2d(samples2[:,2],samples2[:,1]/samples2[:,0], levels=[0.393,0.865], smooth = True,\
+                  plot_datapoints = False, color = 'blue', alpha = alpha, label = 'echo delay only', no_fill_contours = True, plot_density = True)
+    
+    with open(f'mcmc_results//{both}//sampler.pickle', 'rb') as inp:
+        sampler = pickle.load(inp)
+    samples3 = sampler.get_chain(discard=50, thin=5, flat=True)
+    # ~ plt.scatter(samples[:,2],samples[:,1]/samples[:,0], s = s, alpha = 0.8*alpha, label = 'both', c = 'green')
+    corner.hist2d(samples3[:,2],samples3[:,1]/samples3[:,0], levels=[0.393,0.865], smooth = True,\
+                  plot_datapoints = False, color = 'green', alpha = alpha, label = 'both', no_fill_contours = True, plot_density = True)
+    
+    
+    plt.xlabel(r'Inclination ($^{\circ}$)')
+    plt.ylabel(r'q $(m_2/m_1)$')
+    
+    plt.ylim([0,1.3])
+    plt.xlim([15,90])
+    
+    plt.axvline(x=44,c='black')
+    plt.axhline(y=0.5,c='black')
+    plt.scatter([44],[0.5],marker='s',color='black')
+    
+    # ~ plt.legend()
+    plt.show()
+    
+    ################
+    
+    fig, axs = plt.subplots(2,1)
+    asra_lt = delay_model.ASRA_LT_model()
+    
+    pp = np.linspace(0,1,50)
+    VV = []
+    N = 250
+    print(len(samples3)/N)
+    for i in range(len(samples3)//N):
+        guess = samples3[i*N]
+        tt, vv = asra_lt.evaluate_array(pp,*guess)
+        print(f'{i}/{len(samples3)//N}')
+        axs[0].plot(pp,tt,'g-', alpha = 0.15)
+        # ~ axs[2,1].plot(pp,vv,'g-', alpha = 0.15)
+    
+    N = 10
+    for i in range(len(samples3)//N):
+        if i%100 == 0:
+            print(f'{i}/{len(samples3)//N}')
+        guess = samples3[i*N]
+        tt, vv = asra_lt.evaluate_array([0.65,0.70,0.75],*guess)
+        VV.append(max(vv))
+    
+    axs[0].set_xlabel('Orbital Phase')
+    axs[0].set_ylabel('Echo Delay (s)')
+    
+    # ~ axs[0].errorbar(self.echoDelay_data[:,0],self.echoDelay_data[:,1],self.echoDelay_data[:,2], fmt='o', capsize=3, color = 'black')     
+    
+    axs[1].hist(VV,density=True,color='green',bins = 30)
+    axs[1].set_ylabel('PDF')
+    axs[1].axvline(x=74.471133114273,linestyle='--',c='black')
+    axs[1].axvspan(74.471133114273-5,74.471133114273+5,alpha=0.5,color='black')
+    axs[1].set_xlabel(r'$K_{em}$ (km/s)')
+    
+    plt.show()
+
+def appendix_1(m2_in = 0.7, m1_in = 1.4, period_in = 0.787, inclination_in = 44, disk_angle_in = 5):
+    asra_lt = delay_model.ASRA_LT_model()
+    
+    # Trends in m1, m2, inclination, disk angle, (perhaps also orbital period)
+    
+    pp = np.linspace(0,1,100)
+    
+    cmap = cm.jet
+    fig, axs = plt.subplots(2,4)
+    
+    m1m1 = np.linspace(1,2,5, endpoint = True)
+    TT = np.empty([len(m1m1),len(pp)])
+    VV = np.empty([len(m1m1),len(pp)])
+    PP = np.ones([len(m1m1),len(pp)]) * pp
+    for i in range(len(m1m1)):
+        print(f'{i+1}/{len(m1m1)}')
+        TT[i,:], VV[i,:] = asra_lt.evaluate_array(pp,m1_in=m1m1[i],m2_in = m2_in, period_in = period_in, inclination_in = inclination_in, disk_angle_in = disk_angle_in)
+    lc1 = multiline(PP, TT, c = m1m1, ax = axs[0,0], cmap = cmap)
+    lc2 = multiline(PP, VV, c = m1m1, ax = axs[1,0], cmap = cmap)
+    fig.colorbar(lc1)
+    fig.colorbar(lc2)
+    
+    m2m2 = np.linspace(0.1,1,5, endpoint = True)
+    TT = np.empty([len(m2m2),len(pp)])
+    VV = np.empty([len(m2m2),len(pp)])
+    PP = np.ones([len(m2m2),len(pp)]) * pp
+    for i in range(len(m2m2)):
+        print(f'{i+1}/{len(m2m2)}')
+        TT[i,:], VV[i,:] = asra_lt.evaluate_array(pp,m1_in=m1_in,m2_in = m2m2[i], period_in = period_in, inclination_in = inclination_in, disk_angle_in = disk_angle_in)
+    lc1 = multiline(PP, TT, c = m2m2, ax = axs[0,1], cmap = cmap)
+    lc2 = multiline(PP, VV, c = m2m2, ax = axs[1,1], cmap = cmap)
+    fig.colorbar(lc1)
+    fig.colorbar(lc2)
+    
+    ii = np.linspace(0,90,5, endpoint = True)
+    TT = np.empty([len(ii),len(pp)])
+    VV = np.empty([len(ii),len(pp)])
+    PP = np.ones([len(ii),len(pp)]) * pp
+    for i in range(len(ii)):
+        print(f'{i+1}/{len(ii)}')
+        TT[i,:], VV[i,:] = asra_lt.evaluate_array(pp,m1_in=m1_in,m2_in = m2_in, period_in = period_in, inclination_in = ii[i], disk_angle_in = disk_angle_in)
+    lc1 = multiline(PP, TT, c = ii, ax = axs[0,2], cmap = cmap)
+    lc2 = multiline(PP, VV, c = ii, ax = axs[1,2], cmap = cmap)
+    fig.colorbar(lc1)
+    fig.colorbar(lc2)
+    
+    aa = np.linspace(0,15,5, endpoint = True)
+    TT = np.empty([len(aa),len(pp)])
+    VV = np.empty([len(aa),len(pp)])
+    PP = np.ones([len(aa),len(pp)]) * pp
+    for i in range(len(aa)):
+        print(f'{i+1}/{len(aa)}')
+        TT[i,:], VV[i,:] = asra_lt.evaluate_array(pp,m1_in=m1_in,m2_in = m2_in, period_in = period_in, inclination_in = inclination_in, disk_angle_in = aa[i])
+    lc1 = multiline(PP, TT, c = aa, ax = axs[0,3], cmap = cmap)
+    lc2 = multiline(PP, VV, c = aa, ax = axs[1,3], cmap = cmap)
+    fig.colorbar(lc1)
+    fig.colorbar(lc2)
+    
+    titles = [r'$m_1$' + r' $(M_{\odot})$',r'$m_2$' + r' $(M_{\odot})$',r'$i$' + r' $(^{\circ})$',r'$\alpha$' + r' $(^{\circ})$']
+    for i in range(4):
+        axs[1,i].set_xlabel('Orbital Phase')
+        axs[0,i].set_title(titles[i])
+
+    
+    axs[0,0].set_ylabel('Time Delay (s)')
+    axs[1,0].set_ylabel('Radial Velocity (km/s)')
+    
+    plt.show()
+    
 def convert_latex_python():
     with open(r'data\roche_expression.txt', 'r') as f:
         s = f.read().replace('\n', '')
@@ -700,21 +1203,7 @@ def convert_latex_python():
     
     print(s)
 
+# ~ fig1D()
+fig2()
 
-    # ~ fig = corner.corner(samples)
-    # ~ plt.show()
-
- 
-# ~ figB(inclination_in = 45, m1_in = 1.4)
-# ~ plot6()
-# ~ figB()
-# ~ fig1()
-
-# ~ plotRochePotential()
-
-# ~ convert_latex_python()
-
-# ~ figA()
-# ~ figC()
-figB(inclination_in = 90)
-
+# ~ appendix_1()

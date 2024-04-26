@@ -353,16 +353,70 @@ if __name__ == '__main__':
     # ~ mcmc_obj = MCMC_manager()
 
 def load_sampler():
-    with open('mcmc_results//1712128213//sampler.pickle', 'rb') as inp:
+    
+    echo = '1712124156'
+    rv = '1712125465'
+    both = '1712128213'
+    
+    alpha = 0.5
+    s = 3
+    
+    with open(f'mcmc_results//{rv}//sampler.pickle', 'rb') as inp:
         sampler = pickle.load(inp)
+    samples = sampler.get_chain(discard=10, thin=10, flat=True)
+    plt.scatter(samples[:,2],samples[:,1]/samples[:,0], s = s, alpha = alpha)
     
-    samples = sampler.get_chain(discard=10, thin=5, flat=True)
+    with open(f'mcmc_results//{echo}//sampler.pickle', 'rb') as inp:
+        sampler = pickle.load(inp)
+    samples = sampler.get_chain(discard=10, thin=10, flat=True)
+    plt.scatter(samples[:,2],samples[:,1]/samples[:,0], s = s, alpha = alpha)
     
-    var_labels = [r'$m_1$ ($M_\odot$)',r'$m_2$ ($M_\odot$)',r'$i$ ($^{\circ}$)',r'$\alpha$ ($^{\circ}$)']
-    fig = corner.corner(samples, labels=var_labels, quantiles=[0.16, 0.5, 0.84], levels=[0.393,0.865], truths = [1.4, 0.7, 44 , 5], \
-                    show_titles=True, title_kwargs={"fontsize": 12}, smooth = True, plot_datapoints = False, truth_color = 'green')
-                    
+    with open(f'mcmc_results//{both}//sampler.pickle', 'rb') as inp:
+        sampler = pickle.load(inp)
+    samples = sampler.get_chain(discard=10, thin=10, flat=True)
+    plt.scatter(samples[:,2],samples[:,1]/samples[:,0], s = s, alpha = alpha)
+    
+    
     plt.show()
+    
+    # ~ var_labels = [r'$m_1$ ($M_\odot$)',r'$m_2$ ($M_\odot$)',r'$i$ ($^{\circ}$)',r'$\alpha$ ($^{\circ}$)']
+    # ~ fig = corner.corner(samples, labels=var_labels, quantiles=[0.16, 0.5, 0.84], levels=[0.393,0.865], truths = [1.4, 0.7, 44 , 5], \
+                    # ~ show_titles=True, title_kwargs={"fontsize": 12}, smooth = True, plot_datapoints = False, truth_color = 'green')
+                    
+    # ~ plt.show()
+    
+    # ~ print(np.shape(samples))
+    
+    # ~ xx = np.linspace(1,90,100)
+    # ~ yy = 0.04/(np.sin(xx*np.pi/180))**3
+    
+    # ~ yy = 1.9*np.sin(xx*np.pi/180)**(1/3) - 1
+    
+    # ~ plt.plot(xx,yy,'w--')
+    # ~ plt.hist2d(samples[:,2],(samples[:,0]+samples[:,1])/(1+samples[:,1]/samples[:,0])**3,bins=20)
+    # ~ plt.hist2d(samples[:,2],samples[:,1]/samples[:,0],bins=40)
+    
+    
+    # ~ asra_lt = delay_model.ASRA_LT_model()
+    # ~ Q = np.linspace(0.1,1,100)**3
+    # ~ kcorr = np.empty(len(Q))
+    # ~ M_in = 0.7 + 1.4
+    # ~ for qi in range(len(Q)):
+        # ~ m1_in = M_in/(1+Q[qi])
+        # ~ m2_in = Q[qi]*m1_in
+        # ~ t, Kem = asra_lt.evaluate(0.75, m1_in = m1_in, m2_in = m2_in)
+        # ~ K2 = delay_model.radialVelocity(0.75, m1_in = m1_in, m2_in = m2_in)
+        # ~ kcorr[qi] = Kem/K2
+        
+    # ~ yy = 0.05/(np.sin(xx*np.pi/180))**3*kcorr**3
+    # ~ plt.plot(xx,yy,'w-')
+    
+    # ~ plt.show()
+    
+    
+    # ~ plt.hist((samples[:,1]+samples[:,0])/np.sin(samples[:,2]*np.pi/180), bins = 40)
+    
+    # ~ plt.show()
 
-load_sampler()
+# ~ load_sampler()
 
