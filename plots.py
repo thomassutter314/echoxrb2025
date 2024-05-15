@@ -29,7 +29,6 @@ import constants
 import delay_model
 
 
-
 def multiline(xs, ys, c, ax=None, **kwargs):
     """Plot lines with different colorings
 
@@ -1020,6 +1019,7 @@ def fig2():
     alpha = 0.2
     s = 1
     
+    
     with open(f'mcmc_results//{rv}//sampler.pickle', 'rb') as inp:
         sampler = pickle.load(inp)
     samples1 = sampler.get_chain(discard=50, thin=5, flat=True)
@@ -1038,6 +1038,8 @@ def fig2():
         sampler = pickle.load(inp)
     samples3 = sampler.get_chain(discard=50, thin=5, flat=True)
     # ~ plt.scatter(samples[:,2],samples[:,1]/samples[:,0], s = s, alpha = 0.8*alpha, label = 'both', c = 'green')
+    
+    
     corner.hist2d(samples3[:,2],samples3[:,1]/samples3[:,0], levels=[0.393,0.865], smooth = True,\
                   plot_datapoints = False, color = 'green', alpha = alpha, label = 'both', no_fill_contours = True, plot_density = True)
     
@@ -1054,6 +1056,32 @@ def fig2():
     
     # ~ plt.legend()
     plt.show()
+    
+    ################
+    #corner.hist2d(samples1[:,2],samples1[:,1]+samples1[:,0], levels=[0.393,0.865], smooth = True,\
+    #              plot_datapoints = False, color = 'red', alpha = alpha, label = 'both', no_fill_contours = True, plot_density = True)
+    
+    corner.hist2d(samples2[:,2],samples2[:,1]+samples2[:,0], levels=[0.393,0.865], smooth = True,\
+                  plot_datapoints = False, color = 'blue', alpha = alpha, label = 'echo delay only', no_fill_contours = True, plot_density = True)
+    
+    corner.hist2d(samples3[:,2],samples3[:,1]+samples3[:,0], levels=[0.393,0.865], smooth = True,\
+                  plot_datapoints = False, color = 'green', alpha = alpha, label = 'both', no_fill_contours = True, plot_density = True)
+    
+    
+    plt.xlabel(r'Inclination ($^{\circ}$)')
+    plt.ylabel(r'M sol mass')
+    
+    plt.ylim([0,5])
+    plt.xlim([15,90])
+    
+    plt.axvline(x=44,c='black')
+    plt.axhline(y=2.1,c='black')
+    plt.scatter([44],[2.1],marker='s',color='black')
+    
+    # ~ plt.legend()
+    plt.show()
+    
+    
     
     ################
     
