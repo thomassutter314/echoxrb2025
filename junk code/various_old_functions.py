@@ -537,9 +537,72 @@ def timeDelay_3d_asra_limited(beta_approx, inclination_in, disk_angle_in, t0, ph
     else:
         return centroid_delays - t0
 
-
-    # ~ plt.imshow(beta_corrs)
+def fig_mz():
+    # ~ plt.scatter(alphas,N0,label=r'$N_0$')
+    # ~ plt.scatter(alphas,N1,label=r'$N_1$')
+    # ~ plt.scatter(alphas,N2,label=r'$N_2$')
+    # ~ plt.scatter(alphas,N3,label=r'$N_3$')
+    # ~ plt.scatter(alphas,N4,label=r'$N_4$')
+    
+    # ~ plt.legend()
     # ~ plt.show()
+    data = np.loadtxt(r'data/mz_coeffs.txt',delimiter=',')
+    alphas = data[:,0]
+    # ~ alphas = np.array([0])
+    
+    
+    m1_in = 1.14
+    period_in = 0.232
+    
+    inclinations = [40,90]
+    fig, axs = plt.subplots(1,len(inclinations))
+    for i_index in range(len(inclinations)):
+        inclination_in = inclinations[i_index]
+    
+        if inclination_in > 60:
+            N0 = data[:,1]
+            N1 = data[:,2]
+            N2 = data[:,3]
+            N3 = data[:,4]
+            N4 = data[:,5]
+        if inclination_in <= 60:
+            N0 = data[:,6]
+            N1 = data[:,7]
+            N2 = data[:,8]
+            N3 = data[:,9]
+            N4 = data[:,10]
+    
+        q = np.linspace(0,1.5,100)
+        
+        for alpha_index in range(len(alphas)):
+            print('alpha',alphas[alpha_index])
+            
+            k_corr_mz = N0[alpha_index]+N1[alpha_index]*q+N2[alpha_index]*q**2+N3[alpha_index]*q**3+N4[alpha_index]*q**4
+            
+            Q = np.linspace(0.1,1.5,5)
+            k_corr = np.zeros(len(Q))
+            
+            for i in range(len(Q)):
+                k_corr[i] = timeDelay_3d_full(0.25, m1_in = m1_in, m2_in = m1_in*Q[i], period_in = period_in, disk_angle_in = alphas[alpha_index], inclination_in = inclination_in, Q = 25, mode='return_rv')/radialVelocity(0.25, m1_in = m1_in, m2_in = m1_in*Q[i], period_in = period_in, inclination_in = inclination_in)
+            
+            axs[i_index].plot(q, k_corr_mz, color = cm.jet(alpha_index/len(alphas)))
+            axs[i_index].scatter(Q, k_corr, label = r'$\alpha$' + f' = {alphas[alpha_index]}',color=cm.jet(alpha_index/len(alphas)))
+        
+        
+        k_corr_egg = radialVelocity(0.27, m1_in = m1_in, m2_in = m1_in*q, period_in = period_in, inclination_in = inclination_in,setting='egg')/radialVelocity(0.25, m1_in = m1_in, m2_in = m1_in*q, period_in = period_in, inclination_in = inclination_in)
+        axs[i_index].plot(q, k_corr_egg, 'r--', label =  'SP Eggleton')
+        
+        k_corr_egg = radialVelocity(0.27, m1_in = m1_in, m2_in = m1_in*q, period_in = period_in, inclination_in = inclination_in,setting='plav')/radialVelocity(0.25, m1_in = m1_in, m2_in = m1_in*q, period_in = period_in, inclination_in = inclination_in)
+        axs[i_index].plot(q, k_corr_egg, 'k-.', label =  'SP Plavec')
+        
+        axs[i_index].set_xlabel(r'$q=m_2/m_1$')
+        axs[i_index].set_ylabel(r'$K_corr$')
+        axs[i_index].legend()
+        axs[i_index].set_title(f'inclination = {inclination_in} deg')
+        axs[i_index].set_ylim([-.1,1.25])
+        
+
+    plt.show()
     
 
 def timeDelay_3d_asra_partial(phase, \

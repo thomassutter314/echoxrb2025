@@ -24,7 +24,7 @@ plt.rc('figure', titlesize=BIGGER_SIZE)
 import constants
 import delay_model
 
-def genPseudoData(echo_phases, echo_noise, rv_noise, \
+def genPseudoData_full(echo_phases, echo_noise, rv_noise, \
                     m1_in=1.4, m2_in=0.7, inclination_in=44., disk_angle_in=5, period_in=.787):
                         
     echo_noises = echo_noise + np.zeros(len(echo_phases))
@@ -33,14 +33,45 @@ def genPseudoData(echo_phases, echo_noise, rv_noise, \
     delays = np.zeros(len(echo_phases))
     for i in range(len(echo_phases)):
         delays[i] = delay_model.timeDelay_3d_full(echo_phases[i],m1_in=m1_in,m2_in=m2_in,inclination_in=inclination_in,disk_angle_in=disk_angle_in,period_in=period_in,mode = 'return_delay') +\
-                    np.random.normal(scale=echo_noises[i])
+                    np.random.normal(loc = 0, scale = echo_noises[i])
+    
     
     np.savetxt('echo_pseudo_data.csv',np.array([echo_phases, delays, echo_noises]).transpose(),delimiter=',',header='phase, delay (s), error (s)')
 
-    k_em = delay_model.timeDelay_3d_full(0.75,m1_in=m1_in,m2_in=m2_in,inclination_in=inclination_in,disk_angle_in=disk_angle_in,period_in=period_in,mode = 'return_rv') +\
-                    np.random.normal(scale=rv_noise)
-                    
-    np.savetxt('radial_pseudo_data.csv',np.array([0.75, k_em, rv_noise]),delimiter=',',header='phase, radial velocity (km/s), error (km/s)')
+    k_em_list = []
+    phases = [0.70,0.71,0.72,0.73,0.74,0.75]
+    for phase in phases:
+        k_em_list.append(delay_model.timeDelay_3d_full(phase,m1_in=m1_in,m2_in=m2_in,inclination_in=inclination_in,disk_angle_in=disk_angle_in,period_in=period_in,mode = 'return_rv') +\
+                        np.random.normal(loc = 0, scale = rv_noise))
+                        
+    
+    k_em = np.max(k_em_list)
+    phase_max = phases[np.argmax(k_em_list)]
+    np.savetxt('radial_pseudo_data.csv',np.array([phase_max, k_em, rv_noise]),delimiter=',',header='phase, radial velocity (km/s), error (km/s)')
+    
+    
+    plt.scatter(echo_phases, delays)
+    plt.show()
+    
+def genPseudoData_asra(echo_phases, echo_noise, rv_noise, \
+                    m1_in=1.4, m2_in=0.7, inclination_in=44., disk_angle_in=5, period_in=.787):
+                        
+    echo_noises = echo_noise + np.zeros(len(echo_phases))
+    
+    model = delay_model.ASRA_LT_model(period_in = period_in)
+
+    period = period_in * constants.day
+    delays = np.zeros(len(echo_phases))
+    for i in range(len(echo_phases)):
+        delays[i], _ = model.evaluate(echo_phases[i],m1_in=m1_in,m2_in=m2_in,inclination_in=inclination_in,disk_angle_in=disk_angle_in)
+        delays[i] += np.random.normal(loc = 0, scale = 0.01*echo_noises[i])
+    
+    np.savetxt('echo_pseudo_data.csv',np.array([echo_phases, delays, echo_noises]).transpose(),delimiter=',',header='phase, delay (s), error (s)')
+
+    _, k_em = model.evaluate(0.75,m1_in=m1_in,m2_in=m2_in,inclination_in=inclination_in,disk_angle_in=disk_angle_in,period_in=period_in)
+    k_em +=  np.random.normal(loc = 0, scale = 0.01*rv_noise)
+    
+    np.savetxt('radial_pseudo_data.csv',np.array([0.75, k_em, rv_noise]),delimiter=',',header='phase, radial velocity (km/s), error (km/s)')    
     
 class Priors():
     def __init__(self, dist_params):
@@ -88,6 +119,14 @@ class MCMC_manager():
         echoDelay_dataLoc = self.settingsDict['echoDelay_dataLoc']
         radialVelocity_dataLoc = self.settingsDict['radialVelocity_dataLoc']
         self.mode = self.settingsDict['mode']
+        self.eclipse_prior = self.settingsDict['eclipse']
+        if self.eclipse_prior == 'True':
+            self.eclipse_prior = True
+        elif self.eclipse_prior == 'False':
+            self.eclipse_prior = False
+        else:
+            self.eclipse_prior = None
+        
         
         print(f'MCMC run ID = {self.run_id}')
         print(f'mode = {self.mode}')
@@ -143,6 +182,13 @@ class MCMC_manager():
         self.m2_prior_params = self.interpret_dist_string(self.settingsDict['m2_prior'])
         self.i_prior_params = self.interpret_dist_string(self.settingsDict['i_prior'])
         self.alpha_prior_params = self.interpret_dist_string(self.settingsDict['alpha_prior'])
+        
+        print('PRIORS')
+        print('m1_prior',self.settingsDict['m1_prior'])
+        print('m2_prior',self.settingsDict['m2_prior'])
+        print('i_prior',self.settingsDict['i_prior'])
+        print('alpha_prior',self.settingsDict['alpha_prior'])
+        print('eclipse_prior', self.eclipse_prior)
         
         # Generate the priors
         self.m1_prior = Priors(self.m1_prior_params)
@@ -238,29 +284,41 @@ class MCMC_manager():
         if not self.check_physical_param_boundry(m1F, m2F, iF, alphaF):
             return -np.inf
         
-        echo_delay, _ = self.model(x_echo,m1_in=m1F,m2_in=m2F,inclination_in=iF,disk_angle_in=alphaF)
-        _, rv_em = self.model([0.68,0.715,0.75],m1_in=m1F,m2_in=m2F,inclination_in=iF,disk_angle_in=alphaF)
+        # Reject mass ratios above 1
+        if m2F/m1F > 1:
+            return -np.inf
         
-        rv_em = np.max(rv_em)
-        
-        # ~ print(rv_em)
+        if self.eclipse_prior != None:
+            eclipse_bool = self.asra_lt.check_eclipse(m1_in=m1F,m2_in=m2F,inclination_in=iF,period_in=self.period_in,Q=self.Q)
+            if eclipse_bool != self.eclipse_prior:
+                return -np.inf
         
         if self.mode == 'both' or self.mode == 'echo':
+            echo_delay, _ = self.model(x_echo,m1_in=m1F,m2_in=m2F,inclination_in=iF,disk_angle_in=alphaF)
             ln_like_echo = np.sum(-0.5*((y_echo-echo_delay)/y_echo_err)**2 - np.log(y_echo_err) - 0.5*np.log(2*np.pi))
             
         if self.mode == 'both' or self.mode == 'rv':
+            _, rv_em = self.model([0.70,0.725,0.75],m1_in=m1F,m2_in=m2F,inclination_in=iF,disk_angle_in=alphaF)
+            rv_em = np.max(rv_em)
+            # ~ _, rv_em = self.model([0.75],m1_in=m1F,m2_in=m2F,inclination_in=iF,disk_angle_in=alphaF)
+            # ~ rv_em = rv_em[0]
             ln_like_rv = -0.5*((y_rv-rv_em)/y_rv_err)**2 - np.log(y_rv_err) - 0.5*np.log(2*np.pi)
         
         ln_prior = self.m1_prior.evaluate(m1F) + self.m2_prior.evaluate(m2F) + self.i_prior.evaluate(iF) + self.alpha_prior.evaluate(alphaF)
-        
-        if self.mode == 'both':
-            return ln_like_echo + ln_like_rv + ln_prior
-        if self.mode == 'echo':
-            return ln_like_echo + ln_prior
-        if self.mode == 'rv':
-            return ln_like_rv + ln_prior
             
-        
+        # Just for ARA to have a constraint on K1 (this should probably be a central feature)
+        # ~ a = (constants.G*(m1F+m2F)*constants.M_Sun*(self.period_in * constants.day)**2/(4*np.pi**2))**(1/3)
+        # ~ K1 = 1e-3*np.sin(iF*np.pi/180)*2*np.pi*a/(self.period_in * constants.day) * (m2F/(m1F + m2F))
+        # ~ print(K1)
+        # ~ ln_like_K1 = -0.5*((K1 - 101.5)/(11.5))**2
+            
+        if self.mode == 'both':
+            return ln_like_echo + ln_like_rv + ln_prior #+ ln_like_K1
+        if self.mode == 'echo':
+            return ln_like_echo + ln_prior #+ ln_like_K1
+        if self.mode == 'rv':
+            return ln_like_rv + ln_prior #+ ln_like_K1
+            
     # Enterprets the shorthand for distributions of the form (g,loc,scale) and (u,min,max)
     def interpret_dist_string(self, string):
         i1 = string.find('(')
@@ -350,10 +408,14 @@ class MCMC_manager():
             return True
 
 def load_sampler():
-    
     echo = '1712124156'
     rv = '1712125465'
     both = '1712128213'
+    
+    
+    echo = '1718087218'
+    rv = '1718087218'
+    both = '1718087599'
     
     alpha = 0.5
     s = 3
@@ -378,8 +440,9 @@ def load_sampler():
     
     
 if __name__ == '__main__':
-    #load_sampler()
-    # ~ genPseudoData(np.array([0.2,0.4,0.5,0.6,0.8]),0.4,5)
+    # ~ load_sampler()
+    # ~ genPseudoData_full(np.array([0.2,0.3,0.4,0.5,0.6,0.7,0.8]),0.4,5)
+    # ~ genPseudoData(np.array([0.2,0.3,0.4,0.5,0.6,0.7,0.8]),0.4,5)
     mcmc_obj = MCMC_manager()
 
 

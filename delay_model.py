@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 import matplotlib.tri as mtri
 import matplotlib as mpl
+from numba import jit
 import scipy.optimize as opt
 from scipy import interpolate as scpint
 import time
@@ -10,8 +11,10 @@ import pickle
 
 import constants
 
+
+
 class ASRA_LT_model():
-    def __init__(self, period_in = 0.787):
+    def __init__(self):
         # Load the ASRA beta
         with open('asra_beta.pickle', 'rb') as f:
             self.asra_beta = pickle.load(f)
@@ -44,8 +47,6 @@ class ASRA_LT_model():
         
         psi_roche = np.linspace(0, np.pi/2, num=Q, endpoint=True)
         
-        r_roche = np.zeros(len(psi_roche))
-       
         # Azimuthal angle for the Roche Lobe
         beta_roche = np.linspace(0, 2*np.pi, num=Q, endpoint=True)
         
@@ -53,8 +54,11 @@ class ASRA_LT_model():
         PSI_roche, BETA_roche = np.meshgrid(psi_roche, beta_roche)
     
         # numerically solve the equation V(p2,psi,beta) = V(L1) for p2 given psi and beta. Then loop over all psi and beta to construct the full lobe
-        for i in range(len(r_roche)):
-            r_roche[i] = opt.brentq(rochePotential,L1*1e-3,L1,args=(psi_roche[i],asra_beta_val,m1,m2,period,potential_at_L1),maxiter=100)
+        #for i in range(len(r_roche)):
+        #   r_roche[i] = opt.brentq(rochePotential,L1*1e-3,L1,args=(psi_roche[i],asra_beta_val,m1,m2,period,potential_at_L1),maxiter=100)
+        # ~ r_roche = list(np.zeros(len(psi_roche)))
+        
+        r_roche = chandrupatla(rochePotential,L1*1e-3,L1,args=(psi_roche,asra_beta_val,m1,m2,period,potential_at_L1),maxiter=100)
         
         R_roche = np.tile(r_roche, (len(beta_roche),1))
         # Now we unravel this into 1D arrays
@@ -96,12 +100,12 @@ class ASRA_LT_model():
         #Let's compute A2: Projected area on surface of donor towards accretor
         
         # First we need to compute vectors normal to the Roche Lobe surface via a gradient of the potential function
-        vecs_normal_roche = polarGradRochePotential(R_roche,PSI_roche,BETA_roche,m1,m2,period)# returns dV/dp2 vec(p2) + 1/p2*dV/dpsi vec(psi)
+        vecs_normal_roche = np.array(polarGradRochePotential(R_roche,PSI_roche,BETA_roche,m1,m2,period))# returns dV/dp2 vec(p2) + 1/p2*dV/dpsi vec(psi)
         
         # Manage special case of psi = 0 where the gradient function can spuriously evaluate to zero
         psi_zero_indices = (PSI_roche == 0)
-        vecs_normal_roche[0,psi_zero_indices] = 1
-        vecs_normal_roche[1,psi_zero_indices] = 0
+        vecs_normal_roche[0, psi_zero_indices] = 1
+        vecs_normal_roche[1, psi_zero_indices] = 0
         
         # Normalize the vectors to 1
         vecs_normal_roche = vecs_normal_roche/np.sqrt(vecs_normal_roche[0]**2+vecs_normal_roche[1]**2)
@@ -135,6 +139,176 @@ class ASRA_LT_model():
             tt[i], vv[i] = self.evaluate(phases[i], m1_in=m1_in, m2_in=m2_in, inclination_in=inclination_in, disk_angle_in = disk_angle_in, period_in=period_in, Q = Q)
         return tt, vv
     
+    def check_eclipse(self, m1_in=1.4, m2_in=0.7, inclination_in=44., period_in=.787, Q = 25, fancy = True):
+        # Convert to SI units
+        m1 = m1_in * constants.M_Sun
+        m2 = m2_in * constants.M_Sun
+        inclination = inclination_in*np.pi/180
+        period = period_in * constants.day
+        omega = 2*np.pi/period
+        
+        # Compute the orbital semi-major axis
+        a = (constants.G*(m1+m2)*period**2/(4*np.pi**2))**(1/3)
+        r2 = m1/(m1+m2)*a
+        
+        # Compute the location of the L1 Lagrange point
+        roots = np.roots([(omega)**2,-r2*(omega)**2-2*a*(omega)**2,2*a*r2*(omega)**2 + a**2*(omega)**2,constants.G*(m1-m2)-r2*(omega)**2*a**2,2*a*constants.G*m2,-a**2*constants.G*m2])
+        L1 = np.real(roots[np.argmin(np.abs(np.imag(roots)))]) # There should only be one purely real solution in the 5 complex solutions, use that one
+        
+        # Compute the value of the effective gravitational potential at the L1 point
+        potential_at_L1 = rochePotential(L1,psi=0,beta=0,m1=m1,m2=m2,period=period)
+        
+        if fancy:
+            # Fully correct, but also a bit more computationally expensive
+            psi_roche = np.linspace(0, np.pi/2, num=Q, endpoint=True)
+            r_roche = chandrupatla(rochePotential,L1*1e-3,L1,args=(psi_roche,0,m1,m2,period,potential_at_L1),maxiter=100)
+            return np.any(r_roche*np.sin(psi_roche)/(a - r_roche*np.cos(psi_roche)) > 1/np.tan(inclination))
+        else:
+            # Solve for the height of the Roche Lobe at 0 degree angle (height normal to the orbital plane (beta = 90 deg is the orbital plane))
+            H = opt.brentq(rochePotential,L1*1e-3,L1,args=(np.pi/2,0,m1,m2,period,potential_at_L1),maxiter=100)
+            return H/a > 1/np.tan(inclination)
+        
+        
+def chandrupatla(f,x0,x1,verbose=False, 
+                 eps_m = None, eps_a = None, 
+                 maxiter=50, return_iter=False, args=(),):
+    # as written in https://www.embeddedrelated.com/showarticle/855.php
+    # which in turn is based on Chandrupatla's algorithm as described in Scherer
+    # https://books.google.com/books?id=cC-8BAAAQBAJ&pg=PA95
+    # This allows vector arguments for x0, x1, and args
+    
+    # Initialization
+    b = x0
+    a = x1
+    fa = f(a, *args)
+    fb = f(b, *args)
+    
+    # Make sure we know the size of the result
+    shape = np.shape(fa)
+    assert shape == np.shape(fb)
+        
+    # In case x0, x1 are scalars, make sure we broadcast them to become the size of the result
+    b += np.zeros(shape)
+    a += np.zeros(shape)
+
+    fc = fa
+    c = a
+    
+    # Make sure we are bracketing a root in each case
+    assert (np.sign(fa) * np.sign(fb) <= 0).all()
+    t = 0.5
+    # Initialize an array of False,
+    # determines whether we should do inverse quadratic interpolation
+    iqi = np.zeros(shape, dtype=bool)
+    
+    # jms: some guesses for default values of the eps_m and eps_a settings
+    # based on machine precision... not sure exactly what to do here
+    eps = np.finfo(float).eps
+    if eps_m is None:
+        eps_m = eps
+    if eps_a is None:
+        eps_a = 2*eps
+    
+    iterations = 0
+    terminate = False
+    
+    while maxiter > 0:
+        maxiter -= 1
+        # use t to linearly interpolate between a and b,
+        # and evaluate this function as our newest estimate xt
+        xt = a + t*(b-a)
+        ft = f(xt, *args)
+        if verbose:
+            output = 'IQI? %s\nt=%s\nxt=%s\nft=%s\na=%s\nb=%s\nc=%s' % (iqi,t,xt,ft,a,b,c)
+            if verbose == True:
+                print(output)
+            else:
+                print(output,file=verbose)
+        # update our history of the last few points so that
+        # - a is the newest estimate (we're going to update it from xt)
+        # - c and b get the preceding two estimates
+        # - a and b maintain opposite signs for f(a) and f(b)
+        samesign = np.sign(ft) == np.sign(fa)
+        c  = np.choose(samesign, [b,a])
+        b  = np.choose(samesign, [a,b])
+        fc = np.choose(samesign, [fb,fa])
+        fb = np.choose(samesign, [fa,fb])
+        a  = xt
+        fa = ft
+        
+        # set xm so that f(xm) is the minimum magnitude of f(a) and f(b)
+        fa_is_smaller = np.abs(fa) < np.abs(fb)
+        xm = np.choose(fa_is_smaller, [b,a])
+        fm = np.choose(fa_is_smaller, [fb,fa])
+        
+        """
+        the preceding lines are a vectorized version of:
+
+        samesign = np.sign(ft) == np.sign(fa)        
+        if samesign
+            c = a
+            fc = fa
+        else:
+            c = b
+            b = a
+            fc = fb
+            fb = fa
+
+        a = xt
+        fa = ft
+        # set xm so that f(xm) is the minimum magnitude of f(a) and f(b)
+        if np.abs(fa) < np.abs(fb):
+            xm = a
+            fm = fa
+        else:
+            xm = b
+            fm = fb
+        """
+        
+        tol = 2*eps_m*np.abs(xm) + eps_a
+        tlim = tol/np.abs(b-c)
+        terminate = np.logical_or(terminate, np.logical_or(fm==0, tlim > 0.5))
+        if verbose:            
+            output = "fm=%s\ntlim=%s\nterm=%s" % (fm,tlim,terminate)
+            if verbose == True:
+                print(output)
+            else:
+                print(output, file=verbose)
+
+        if np.all(terminate):
+            break
+        iterations += 1-terminate
+        
+        # Figure out values xi and phi 
+        # to determine which method we should use next
+        xi  = (a-b)/(c-b)
+        phi = (fa-fb)/(fc-fb)
+        iqi = np.logical_and(phi**2 < xi, (1-phi)**2 < 1-xi)
+            
+        if not shape:
+            # scalar case
+            if iqi:
+                # inverse quadratic interpolation
+                t = fa / (fb-fa) * fc / (fb-fc) + (c-a)/(b-a)*fa/(fc-fa)*fb/(fc-fb)
+            else:
+                # bisection
+                t = 0.5
+        else:
+            # array case
+            t = np.full(shape, 0.5)
+            a2,b2,c2,fa2,fb2,fc2 = a[iqi],b[iqi],c[iqi],fa[iqi],fb[iqi],fc[iqi]
+            t[iqi] = fa2 / (fb2-fa2) * fc2 / (fb2-fc2) + (c2-a2)/(b2-a2)*fa2/(fc2-fa2)*fb2/(fc2-fb2)
+        
+        # limit to the range (tlim, 1-tlim)
+        t = np.minimum(1-tlim, np.maximum(tlim, t))
+        
+    # done!
+    if return_iter:
+        return xm, iterations
+    else:
+        return xm
+
+@jit(nopython = True)
 def rochePotential(p2,psi,beta,m1,m2,period,Uconst = 0):   
     a = (constants.G*(m1+m2)*(period/(2*np.pi))**2)**(1/3)
     r2 = m1/(m1+m2)*a
@@ -144,6 +318,7 @@ def rochePotential(p2,psi,beta,m1,m2,period,Uconst = 0):
        -0.5*(2*np.pi/period)**2*p2**2*((np.cos(psi)-r2/p2)**2 + (np.sin(psi)*np.sin(beta))**2) \
        -Uconst
 
+@jit(nopython = True)
 def polarGradRochePotential(p2,psi,beta,m1,m2,period):
     a = (constants.G*(m1+m2)*(period/(2*np.pi))**2)**(1/3)
     r2 = m1/(m1+m2)*a
@@ -154,8 +329,9 @@ def polarGradRochePotential(p2,psi,beta,m1,m2,period):
              
     dV_dpsi = constants.G*m1*a*p2*np.sin(psi)/(a**2+p2**2-2*a*p2*np.cos(psi))**(1.5) +\
               -(2*np.pi/period)**2*p2*(r2*np.sin(psi) - 0.5*p2*np.sin(2*psi)*np.cos(beta)**2)
-              
-    return np.array([dV_dp2,p2**(-1)*dV_dpsi])
+    
+    return [dV_dp2, p2**(-1)*dV_dpsi]
+    # ~ return np.array([dV_dp2, p2**(-1)*dV_dpsi])
 
 def timeDelay_sp(phase, \
                 m1_in=1.4, m2_in=0.7, inclination_in=44., period_in=0.787,\
@@ -265,9 +441,10 @@ def timeDelay_3d_full(phase, \
     vecs_normal_roche = polarGradRochePotential(R_roche,PSI_roche,BETA_roche,m1,m2,period)# returns dV/dp2 vec(p2) + 1/p2*dV/dpsi vec(psi)
     
     # Manage special case of psi = 0 where the gradient function can spuriously evaluate to zero
-    psi_zero_indices = (PSI_roche == 0)
-    vecs_normal_roche[0,psi_zero_indices] = 1
-    vecs_normal_roche[1,psi_zero_indices] = 0
+    psi_zero_indices = PSI_roche == 0
+    
+    vecs_normal_roche[0][psi_zero_indices] = 1
+    vecs_normal_roche[1][psi_zero_indices] = 0
     
     # Normalize the vectors to 1
     vecs_normal_roche = vecs_normal_roche/np.sqrt(vecs_normal_roche[0]**2+vecs_normal_roche[1]**2)
@@ -295,7 +472,7 @@ def timeDelay_3d_full(phase, \
         centroid_rv = 0
     
     if mode == 'plot':
-        pview, aview = 38, 45
+        pview, aview = 20, 65
         
         x, y, z = R_roche*np.cos(BETA_roche)*np.sin(PSI_roche), R_roche*np.sin(BETA_roche)*np.sin(PSI_roche), R_roche*np.cos(PSI_roche)
         
@@ -422,8 +599,9 @@ def timeDelay_3d_full(phase, \
         delays_binned = np.mean(delays_reshaped, axis=1)
         observed_intensities_binned = np.mean(observed_intensities_reshaped, axis=1)
         
-        axs[0].scatter(delays, observed_intensities,s=3)
-        axs[0].scatter(delays_binned, observed_intensities_binned,label='binned')
+        # ~ axs[0].scatter(delays, observed_intensities,s=3)
+        axs[0].plot(delays_binned, observed_intensities_binned,'b-',label='binned', zorder = -10)
+        axs[0].scatter(delays_binned, observed_intensities_binned,fc = 'white', ec = 'black',label='binned')
         axs[0].axvline(x=centroid_delays,c='black',label=f'centorid = {round(centroid_delays,2)} s',linestyle='--')
         axs[0].set_xlabel('Time Delay (s)')
         axs[0].set_ylabel('Observed Intensity (a.u.)')
@@ -441,13 +619,15 @@ def timeDelay_3d_full(phase, \
         radial_velocity_binned = np.mean(radial_velocity_reshaped, axis=1)
         observed_intensities_binned = np.mean(observed_intensities_reshaped, axis=1)
         
-        axs[1].scatter(radial_velocity, observed_intensities,s=3)
-        axs[1].scatter(radial_velocity_binned, observed_intensities_binned,label='binned')
+        # ~ axs[1].scatter(radial_velocity, observed_intensities,s=3)
+        axs[1].plot(radial_velocity_binned, observed_intensities_binned,'b-', zorder = -10)
+        axs[1].scatter(radial_velocity_binned, observed_intensities_binned,fc = 'white', ec = 'black',label='binned')
         axs[1].axvline(x=centroid_rv,c='black',label=f'centorid = {round(centroid_rv,2)} km/s',linestyle='--')
         axs[1].set_xlabel('Radial Velocity (km/s)')
         axs[1].set_ylabel('Observed Intensity (a.u.)')
         
-        plt.legend()
+        axs[0].legend()
+        axs[1].legend()
         plt.show()
         
     if mode == 'return_delay':
@@ -483,10 +663,10 @@ def timeDelay_3d_full(phase, \
             plt.ylabel('Intensity')
             plt.show()
         
-        return vv[np.argmax(ii)]
+        # ~ return vv[np.argmax(ii)]
         # ~ return radial_velocity_binned[np.argmax(observed_intensities_binned)]
         # ~ return tt[np.argmax(yy)]
-        # ~ return centroid_rv
+        return centroid_rv
 
 def timeDelay_3d_asra(phase, \
                   m1_in=1.4, m2_in=0.7, inclination_in=44., disk_angle_in = 5, period_in=.787, Q = 25, mode = 'return_delay', asra_beta = 0):
@@ -858,74 +1038,6 @@ def radialVelocity(phase, \
     return -1*1e-3*np.sin(2*np.pi*phase)*np.sin(inclination)*2*np.pi*a/period*(1/(1+q))*(1-radiusDonor/a*(1+q))
 
 
-# out dated
-def load_and_interp_munoz_darias():
-    # ~ plt.scatter(alphas,N0,label=r'$N_0$')
-    # ~ plt.scatter(alphas,N1,label=r'$N_1$')
-    # ~ plt.scatter(alphas,N2,label=r'$N_2$')
-    # ~ plt.scatter(alphas,N3,label=r'$N_3$')
-    # ~ plt.scatter(alphas,N4,label=r'$N_4$')
-    
-    # ~ plt.legend()
-    # ~ plt.show()
-    data = np.loadtxt(r'data/mz_coeffs.txt',delimiter=',')
-    alphas = data[:,0]
-    # ~ alphas = np.array([0])
-    
-    
-    m1_in = 1.14
-    period_in = 0.232
-    
-    inclinations = [40,90]
-    fig, axs = plt.subplots(1,len(inclinations))
-    for i_index in range(len(inclinations)):
-        inclination_in = inclinations[i_index]
-    
-        if inclination_in > 60:
-            N0 = data[:,1]
-            N1 = data[:,2]
-            N2 = data[:,3]
-            N3 = data[:,4]
-            N4 = data[:,5]
-        if inclination_in <= 60:
-            N0 = data[:,6]
-            N1 = data[:,7]
-            N2 = data[:,8]
-            N3 = data[:,9]
-            N4 = data[:,10]
-    
-        q = np.linspace(0,1.5,100)
-        
-        for alpha_index in range(len(alphas)):
-            print('alpha',alphas[alpha_index])
-            
-            k_corr_mz = N0[alpha_index]+N1[alpha_index]*q+N2[alpha_index]*q**2+N3[alpha_index]*q**3+N4[alpha_index]*q**4
-            
-            Q = np.linspace(0.1,1.5,5)
-            k_corr = np.zeros(len(Q))
-            
-            for i in range(len(Q)):
-                k_corr[i] = timeDelay_3d_full(0.25, m1_in = m1_in, m2_in = m1_in*Q[i], period_in = period_in, disk_angle_in = alphas[alpha_index], inclination_in = inclination_in, Q = 60, mode='return_rv')/radialVelocity(0.25, m1_in = m1_in, m2_in = m1_in*Q[i], period_in = period_in, inclination_in = inclination_in)
-            
-            axs[i_index].plot(q, k_corr_mz, color = cm.jet(alpha_index/len(alphas)))
-            axs[i_index].scatter(Q, k_corr, label = r'$\alpha$' + f' = {alphas[alpha_index]}',color=cm.jet(alpha_index/len(alphas)))
-        
-        
-        k_corr_egg = radialVelocity(0.27, m1_in = m1_in, m2_in = m1_in*q, period_in = period_in, inclination_in = inclination_in,setting='egg')/radialVelocity(0.25, m1_in = m1_in, m2_in = m1_in*q, period_in = period_in, inclination_in = inclination_in)
-        axs[i_index].plot(q, k_corr_egg, 'r--', label =  'SP Eggleton')
-        
-        k_corr_egg = radialVelocity(0.27, m1_in = m1_in, m2_in = m1_in*q, period_in = period_in, inclination_in = inclination_in,setting='plav')/radialVelocity(0.25, m1_in = m1_in, m2_in = m1_in*q, period_in = period_in, inclination_in = inclination_in)
-        axs[i_index].plot(q, k_corr_egg, 'k-.', label =  'SP Plavec')
-        
-        axs[i_index].set_xlabel(r'$q=m_2/m_1$')
-        axs[i_index].set_ylabel(r'$K_corr$')
-        axs[i_index].legend()
-        axs[i_index].set_title(f'inclination = {inclination_in} deg')
-        axs[i_index].set_ylim([-.1,1.25])
-        
-
-    plt.show()
- 
 
 def timeDelay_radialVelocity_3d(phase, \
                   m1_in=1.4, m2_in=0.7, inclination_in=44., disk_angle_in = 0, period_in=.787, plot = True, Q = 35, beta_approx = 0):
@@ -1183,22 +1295,17 @@ def timeDelay_radialVelocity_3d(phase, \
         return centroid_delays, centroid_radial_velocity
 
 
-# ~ load_and_interp_munoz_darias()
 
 # ~ calibrate_asra(mode='plot')
     # ~ print(alphas)
     # ~ print(np.shape(data))
 # ~ load_and_interp_munoz_darias()
 
-
-# ~ t0 = time.time()
-# ~ for i in range(100):
-# ~ timeDelay_3d_asra(0.5,period_in = 0.01,m2_in=45,Q=50,disk_angle_in=0, mode = 'plot')
-# ~ tf = time.time()
-# ~ print(tf-t0)
-
+if __name__ == '__main__':
+    model = ASRA_LT_model()
+    
+    
+    
 
 
-# ~ timeDelay_3d_full(0.25,Q=50,disk_angle_in=0,mode='plot')
-# ~ timeDelay_radialVelocity_3d(0.25,m2_in=1.4*2)
 

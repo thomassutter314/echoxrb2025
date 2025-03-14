@@ -1,0 +1,15 @@
+walker_number:50
+walker_steps:1000
+mode:rv
+Q:25
+period_in:0.787
+echoDelay_dataLoc:echo_pseudo_data.csv
+radialVelocity_dataLoc:radial_pseudo_data.csv
+m1_guess:(g,1.45,0.1)
+m2_guess:(g,0.7,0.1)
+i_guess:(g,44,5)
+alpha_guess:(u,1,10)
+m1_prior:(u,1.2,2.5)
+m2_prior:(u,0.01,100)
+i_prior:(u,0,89)
+alpha_prior:(u,0,18)

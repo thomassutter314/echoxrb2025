@@ -1,0 +1,27 @@
+Input Settings 
+ 
+walker_number:50
+walker_steps:1000
+mode:rv
+Q:25
+period_in:0.15804693
+echoDelay_dataLoc:echo_ara.csv
+radialVelocity_dataLoc:radial_ara.csv
+m1_guess:(g,1.5,0.1)
+m2_guess:(g,0.40,0.1)
+i_guess:(u,20,60)
+alpha_guess:(u,1,10)
+m1_prior:(u,1.2,2.5)
+m2_prior:(u,0.01,5)
+i_prior:(u,0,89)
+alpha_prior:(u,0,20)
+eclipse:False
+
+MCMC Run Metadata 
+ 
+start_time:2024-08-30 00:23:13
+mode:rv
+finish_time:2024-08-30 00:26:31
+run_duration:197.2 s
+mean_acceptance_fraction:0.47716000000000003
+auto_corr_time:[41.52914244 42.27165512 38.49446859 52.43957194]

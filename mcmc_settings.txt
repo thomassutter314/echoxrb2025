@@ -1,23 +1,18 @@
-walker_number: 50
-walker_steps: 500
-mode: both # Modes are "both", "echo", and "rv"
-Q: 25 # Sampling in the polar and azimuthal angle for the Roche lobe construction, total number of trianlges is Q^2
-period_in: 0.787 # orbital period in days
+walker_number:50
+walker_steps:1000
+mode:echo
+Q:25
+period_in:0.787
+echoDelay_dataLoc:echo_pseudo_data.csv
+radialVelocity_dataLoc:radial_pseudo_data.csv
+m1_guess:(g,1.45,0.1)
+m2_guess:(g,0.7,0.1)
+i_guess:(g,44,5)
+alpha_guess:(u,1,10)
+m1_prior:(u,1.2,2.5)
+m2_prior:(u,0.01,100)
+i_prior:(u,0,89)
+alpha_prior:(u,0,18)
 
-# Data locations
-echoDelay_dataLoc: echo_sco.csv
-radialVelocity_dataLoc: radial_sco.csv
-
-
-# Define the guess distributions on each variable (g for Gaussian, loc, scale), (u for uniform, min, max)
-m1_guess: (g, 1.4, 0.1)
-m2_guess: (g, 0.7, 0.1)
-i_guess: (g, 44, 5)
-alpha_guess: (u, 1, 10)
-
-# Define the prior distributions on each variable (g for Gaussian, loc, scale), (u for uniform, min, max)
-m1_prior: (u, 1.2, 2.5)
-m2_prior: (u, 0.1, 5)
-i_prior: (u, 0, 90)
-alpha_prior: (u, 0, 20)
-
+# Binary condition on whether the donor eclipses the compact object. you can set None, True, or False (None means the eclipse isn't considered at all)
+eclipse: None
