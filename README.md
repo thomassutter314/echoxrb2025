@@ -1,6 +1,6 @@
 **Introduction**
 
-Simulation of X-ray/optical light echos in X-ray binary systems with implementation of MCMC recovery of orbital parameters.
+Simulation of X-ray/optical light echoes in X-ray binary systems with implementation of MCMC recovery of orbital parameters.
 The MCMC algorithm takes measurements of (orbital phase, echo delay time, echo delay time 1-sigma error) and outputs a posterior distribution.
 Radial velocity measurements can be included as an additional constraint. The radial velocity data can be entered as a single value of (K_em, K_em 1-sigma error) or as a full curve: (phase, velocity, velocity 1-sigma error).
 Along with echo delay and radial velocity measurements, further constraints can be included with prior distributions. For instance, in neutron star systems, we apply a uniform prior on the neutron star mass between 1 and 2.5 solar masses (based on physical constraints and the distribution of known neutron star masses).
@@ -59,11 +59,6 @@ Finally, we can specify whether the donor is known to eclipse the compact object
 Save the ``mcmc_settings.txt`` file and open ``mcmc_fitting.py``. Run ``mcmc_obj = MCMC_manager()``. This will automatically begin running a parameter recovery. Results are saved in the ``mcmc_results`` directory. Specifically, the files will be in a subdirectory named as the UNIX time when the run began. The state of the sampler is saved as ``sampler.pickle``.
 
 To see an example of how to pull results from this file and plot, refer to the ``fig3`` function of ``generate_figures.py``.
-
-
-
-
-
 
 
 
