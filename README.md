@@ -1,3 +1,7 @@
+Most current version of echoxrb is in https://github.com/thomassutter314/echoxrb
+
+This repo is a static version associated with the publication: Orbital parameter estimation from X-ray/optical echo mapping in X-ray binaries
+
 **Introduction**
 
 Simulation of X-ray/optical light echoes in X-ray binary systems with implementation of MCMC recovery of orbital parameters.
